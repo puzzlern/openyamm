@@ -730,6 +730,28 @@ std::optional<GameplayScreenRuntime::ResolvedHudLayoutElement> GameplayScreenRun
     return resolveHudLayoutElement("ObsidianTurnPassButton", width, height, 0, 0);
 }
 
+std::optional<GameplayScreenRuntime::ResolvedHudLayoutElement> GameplayScreenRuntime::resolveUseWandButton(
+    int width,
+    int height) const
+{
+    const Party *pParty = partyReadOnly();
+    if (pParty == nullptr || !turnBasedCombatRuntime().active()
+        || currentHudScreenState() != GameplayHudScreenState::Gameplay || pendingSpellTargetActive())
+    {
+        return std::nullopt;
+    }
+    const size_t memberIndex = pParty->activeMemberIndex();
+    const uint32_t wandId = pParty->equippedItemId(memberIndex, EquipmentSlot::Wand);
+    const uint32_t mainHandId = pParty->equippedItemId(memberIndex, EquipmentSlot::MainHand);
+    const ItemDefinition *pMainHand = mainHandId != 0 && itemTable() != nullptr
+        ? itemTable()->get(mainHandId) : nullptr;
+    if (wandId == 0 && (pMainHand == nullptr || pMainHand->equipStat != "WeaponW"))
+    {
+        return std::nullopt;
+    }
+    return resolveHudLayoutElement("ObsidianTurnUseWandButton", width, height, 0, 0);
+}
+
 const char *GameplayScreenRuntime::mobileInspectLayoutId() const
 {
     return currentHudScreenState() == GameplayHudScreenState::Gameplay
@@ -4394,6 +4416,19 @@ std::optional<GameplayResolvedHudLayoutElement> GameplayScreenRuntime::resolveCh
         GameplayResolvedHudLayoutElement rect = {};
         rect.x = std::round(resolved->x + static_cast<float>(offsetX) * resolved->scale);
         rect.y = std::round(resolved->y + static_cast<float>(offsetY) * resolved->scale);
+        rect.width = iconWidth;
+        rect.height = iconHeight;
+        rect.scale = resolved->scale;
+        return applyVisualPlacement(rect);
+    }
+
+    if (slot == EquipmentSlot::Wand)
+    {
+        const int bowX = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetX : 0;
+        const int bowY = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetY : 0;
+        GameplayResolvedHudLayoutElement rect = {};
+        rect.x = std::round(resolved->x + static_cast<float>(bowX - 44) * resolved->scale - iconWidth * 0.5f);
+        rect.y = std::round(resolved->y + static_cast<float>(bowY - 30) * resolved->scale - iconHeight * 0.5f);
         rect.width = iconWidth;
         rect.height = iconHeight;
         rect.scale = resolved->scale;

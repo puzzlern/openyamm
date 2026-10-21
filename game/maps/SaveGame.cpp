@@ -21,7 +21,7 @@ namespace OpenYAMM::Game
 {
 namespace
 {
-constexpr uint32_t SaveVersion = 94;
+constexpr uint32_t SaveVersion = 95;
 constexpr uint32_t SaveVersionAttackSpell = 19;
 constexpr uint32_t SaveVersionIndoorCorpseViews = 21;
 constexpr uint32_t SaveVersionIndoorChestViews = 22;
@@ -104,6 +104,7 @@ constexpr uint32_t SaveVersionActorRevealedLoot = 91;
 constexpr uint32_t SaveVersionHardenedItems = 92;
 constexpr uint32_t SaveVersionPotionCharacterBuffs = 93;
 constexpr uint32_t SaveVersionMapMoveStartPoint = 94;
+constexpr uint32_t SaveVersionEquipmentWandSlot = 95;
 constexpr char SaveMagic[8] = {'O', 'Y', 'S', 'A', 'V', 'E', '1', '\0'};
 
 std::string toLowerCopy(const std::string &value)
@@ -692,6 +693,7 @@ void writeValue(BinaryWriter &writer, const CharacterEquipment &value)
     writeValue(writer, value.offHand);
     writeValue(writer, value.mainHand);
     writeValue(writer, value.bow);
+    writeValue(writer, value.wand);
     writeValue(writer, value.armor);
     writeValue(writer, value.helm);
     writeValue(writer, value.belt);
@@ -712,6 +714,7 @@ bool readValue(BinaryReader &reader, CharacterEquipment &value)
     return readValue(reader, value.offHand)
         && readValue(reader, value.mainHand)
         && readValue(reader, value.bow)
+        && (reader.version() < SaveVersionEquipmentWandSlot || readValue(reader, value.wand))
         && readValue(reader, value.armor)
         && readValue(reader, value.helm)
         && readValue(reader, value.belt)
@@ -764,6 +767,7 @@ void writeValue(BinaryWriter &writer, const CharacterEquipmentRuntimeState &valu
     writeValue(writer, value.offHand);
     writeValue(writer, value.mainHand);
     writeValue(writer, value.bow);
+    writeValue(writer, value.wand);
     writeValue(writer, value.armor);
     writeValue(writer, value.helm);
     writeValue(writer, value.belt);
@@ -784,6 +788,7 @@ bool readValue(BinaryReader &reader, CharacterEquipmentRuntimeState &value)
     return readValue(reader, value.offHand)
         && readValue(reader, value.mainHand)
         && readValue(reader, value.bow)
+        && (reader.version() < SaveVersionEquipmentWandSlot || readValue(reader, value.wand))
         && readValue(reader, value.armor)
         && readValue(reader, value.helm)
         && readValue(reader, value.belt)

@@ -485,6 +485,10 @@ enum class GameplayHudPointerTargetType
 {
     None,
     MenuButton,
+    ScrollsButton,
+    PotionsButton,
+    ScrollMenuItem,
+    DismissScrollMenu,
     RestButton,
     BooksButton,
     InventoryButton,
@@ -496,6 +500,7 @@ enum class GameplayHudPointerTargetType
     CastButton,
     TurnBasedToggleButton,
     PassTurnButton,
+    UseWandButton,
     ContextActionButton,
     MinimapZoomInButton,
     MinimapZoomOutButton,
@@ -668,8 +673,19 @@ struct GameplayInventoryNestedOverlayPointerTarget
     bool operator==(const GameplayInventoryNestedOverlayPointerTarget &other) const = default;
 };
 
+enum class GameplayCursorType
+{
+    Hand,
+    Grab,
+    Knock,
+    Mouth,
+};
+
 struct GameplayOverlayInteractionState
 {
+    GameplayCursorType gameplayCursorHoverType = GameplayCursorType::Hand;
+    GameplayCursorType gameplayCursorActionType = GameplayCursorType::Hand;
+    uint64_t gameplayCursorActionUntilNanoseconds = 0;
     int dialogueBodyScrollLines = 0;
     std::string dialogueBodyText;
     std::string dialogueStatusHint;
@@ -688,17 +704,22 @@ struct GameplayOverlayInteractionState
     GameplayWorldHit gameplayHudPressedContextActionHit = {};
     bool gameplayHudQuickCastRequested = false;
     bool gameplayHudAttackRequested = false;
+    bool gameplayHudUseWandRequested = false;
     bool gameplayHudTriggerRequested = false;
     bool gameplayHudSpellTargetConfirmRequested = false;
     bool gameplayHudSpellTargetCancelRequested = false;
     bool gameplayHudDropHeldItemRequested = false;
     bool partyBuffPopupOpen = false;
+    bool scrollMenuOpen = false;
+    bool potionsMenuOpen = false;
+    size_t scrollMenuScrollOffset = 0;
     std::optional<size_t> personalBuffPopupMember;
     bool overlayPersonalBuffClickLatch = false;
     std::optional<size_t> overlayPersonalBuffPressedIndex;
     bool followerPanelOpen = false;
     size_t followerPanelScrollOffset = 0;
     bool menuToggleLatch = false;
+    bool itemMenuToggleLatch = false;
     bool menuClickLatch = false;
     GameplayMenuPointerTarget menuPressedTarget = {};
     bool controlsToggleLatch = false;

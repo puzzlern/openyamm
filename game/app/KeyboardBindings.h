@@ -54,6 +54,9 @@ enum class KeyboardAction : uint8_t
     FlyDown,
     Land,
     DoubleSpeed,
+    Scrolls,
+    Potions,
+    UseWand,
     Count
 };
 

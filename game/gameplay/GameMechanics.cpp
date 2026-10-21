@@ -95,6 +95,7 @@ struct EquippedItems
     const ItemDefinition *pOffHand = nullptr;
     const ItemDefinition *pMainHand = nullptr;
     const ItemDefinition *pBow = nullptr;
+    const ItemDefinition *pWand = nullptr;
     const ItemDefinition *pArmor = nullptr;
     const ItemDefinition *pHelm = nullptr;
     const ItemDefinition *pBelt = nullptr;
@@ -122,6 +123,8 @@ uint32_t equippedItemId(const CharacterEquipment &equipment, EquipmentSlot slot)
 
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
 
         case EquipmentSlot::Armor:
             return equipment.armor;
@@ -586,6 +589,9 @@ const ItemDefinition *getEquippedItem(const Character &character, EquipmentSlot 
         case EquipmentSlot::Bow:
             pRuntimeState = &character.equipmentRuntime.bow;
             break;
+        case EquipmentSlot::Wand:
+            pRuntimeState = &character.equipmentRuntime.wand;
+            break;
 
         case EquipmentSlot::Armor:
             pRuntimeState = &character.equipmentRuntime.armor;
@@ -664,6 +670,7 @@ EquippedItems resolveEquippedItems(const Character &character, const ItemTable *
     equippedItems.pOffHand = getEquippedItem(character, EquipmentSlot::OffHand, pItemTable);
     equippedItems.pMainHand = getEquippedItem(character, EquipmentSlot::MainHand, pItemTable);
     equippedItems.pBow = getEquippedItem(character, EquipmentSlot::Bow, pItemTable);
+    equippedItems.pWand = getEquippedItem(character, EquipmentSlot::Wand, pItemTable);
     equippedItems.pArmor = getEquippedItem(character, EquipmentSlot::Armor, pItemTable);
     equippedItems.pHelm = getEquippedItem(character, EquipmentSlot::Helm, pItemTable);
     equippedItems.pBelt = getEquippedItem(character, EquipmentSlot::Belt, pItemTable);
@@ -680,12 +687,13 @@ EquippedItems resolveEquippedItems(const Character &character, const ItemTable *
     return equippedItems;
 }
 
-std::array<const ItemDefinition *, 16> allEquippedItems(const EquippedItems &equippedItems)
+std::array<const ItemDefinition *, 17> allEquippedItems(const EquippedItems &equippedItems)
 {
     return {
         equippedItems.pOffHand,
         equippedItems.pMainHand,
         equippedItems.pBow,
+        equippedItems.pWand,
         equippedItems.pArmor,
         equippedItems.pHelm,
         equippedItems.pBelt,
@@ -1091,7 +1099,7 @@ int resolveArmorSkillBonus(const Character &character, const EquippedItems &equi
     bool wearingArmor = false;
     bool wearingLeather = false;
     int armorClassBonus = 0;
-    const std::array<const ItemDefinition *, 16> equipped = allEquippedItems(equippedItems);
+    const std::array<const ItemDefinition *, 17> equipped = allEquippedItems(equippedItems);
 
     for (const ItemDefinition *pItemDefinition : equipped)
     {
@@ -1160,7 +1168,7 @@ int resolveArmorSkillBonus(const Character &character, const EquippedItems &equi
 int resolvePassiveArmorBonus(const EquippedItems &equippedItems)
 {
     int armorValue = 0;
-    const std::array<const ItemDefinition *, 16> equipped = allEquippedItems(equippedItems);
+    const std::array<const ItemDefinition *, 17> equipped = allEquippedItems(equippedItems);
 
     for (const ItemDefinition *pItemDefinition : equipped)
     {
@@ -3450,10 +3458,11 @@ bool GameMechanics::isEquipmentAllowedWithWetsuit(
     uint32_t targetItemId,
     std::optional<EquipmentSlot> displacedSlot)
 {
-    static constexpr std::array<EquipmentSlot, 16> EquipmentSlots = {{
+    static constexpr std::array<EquipmentSlot, 17> EquipmentSlots = {{
         EquipmentSlot::OffHand,
         EquipmentSlot::MainHand,
         EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
         EquipmentSlot::Armor,
         EquipmentSlot::Helm,
         EquipmentSlot::Belt,
@@ -3611,6 +3620,19 @@ std::optional<CharacterEquipPlan> GameMechanics::resolveCharacterEquipPlan(
             plan.targetSlot = EquipmentSlot::Amulet;
             plan.displacedSlot = equippedItemId(character.equipment, EquipmentSlot::Amulet) != 0
                 ? std::optional<EquipmentSlot>(EquipmentSlot::Amulet)
+                : std::nullopt;
+            return finishPlan(plan);
+        }
+
+        if (itemDefinition.equipStat == "WeaponW")
+        {
+            if (slot != EquipmentSlot::Wand)
+            {
+                return std::nullopt;
+            }
+            plan.targetSlot = EquipmentSlot::Wand;
+            plan.displacedSlot = equippedItemId(character.equipment, EquipmentSlot::Wand) != 0
+                ? std::optional<EquipmentSlot>(EquipmentSlot::Wand)
                 : std::nullopt;
             return finishPlan(plan);
         }
@@ -3781,7 +3803,16 @@ std::optional<CharacterEquipPlan> GameMechanics::resolveCharacterEquipPlan(
 
         return finishPlan(plan);
     }
-    else if (itemDefinition.equipStat == "Weapon" || itemDefinition.equipStat == "WeaponW")
+    else if (itemDefinition.equipStat == "WeaponW")
+    {
+        plan.targetSlot = EquipmentSlot::Wand;
+        if (equippedItemId(character.equipment, EquipmentSlot::Wand) != 0)
+        {
+            plan.displacedSlot = EquipmentSlot::Wand;
+        }
+        return finishPlan(plan);
+    }
+    else if (itemDefinition.equipStat == "Weapon")
     {
         const std::string skillName = canonicalSkillName(itemDefinition.skillGroup);
         const bool canUseOffHand =

@@ -824,6 +824,8 @@ const char *equipmentSlotName(EquipmentSlot slot)
             return "OffHand";
         case EquipmentSlot::Bow:
             return "Bow";
+        case EquipmentSlot::Wand:
+            return "Wand";
         case EquipmentSlot::Armor:
             return "Armor";
         case EquipmentSlot::Helm:
@@ -1306,6 +1308,8 @@ uint32_t &equippedItemId(CharacterEquipment &equipment, EquipmentSlot slot)
 
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
 
         case EquipmentSlot::Armor:
             return equipment.armor;
@@ -1362,6 +1366,8 @@ uint32_t equippedItemId(const CharacterEquipment &equipment, EquipmentSlot slot)
 
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
 
         case EquipmentSlot::Armor:
             return equipment.armor;
@@ -1418,6 +1424,8 @@ EquippedItemRuntimeState &equippedItemRuntimeState(CharacterEquipmentRuntimeStat
 
         case EquipmentSlot::Bow:
             return equipmentRuntime.bow;
+        case EquipmentSlot::Wand:
+            return equipmentRuntime.wand;
 
         case EquipmentSlot::Armor:
             return equipmentRuntime.armor;
@@ -1476,6 +1484,8 @@ const EquippedItemRuntimeState &equippedItemRuntimeState(
 
         case EquipmentSlot::Bow:
             return equipmentRuntime.bow;
+        case EquipmentSlot::Wand:
+            return equipmentRuntime.wand;
 
         case EquipmentSlot::Armor:
             return equipmentRuntime.armor;
@@ -2254,6 +2264,27 @@ void Party::reset()
 void Party::setItemTable(const ItemTable *pItemTable)
 {
     m_pItemTable = pItemTable;
+
+    if (m_pItemTable == nullptr)
+    {
+        return;
+    }
+
+    // Move wands saved in the old main-hand slot into the dedicated slot.
+    for (Character &member : m_members)
+    {
+        if (member.equipment.mainHand == 0 || member.equipment.wand != 0)
+        {
+            continue;
+        }
+
+        const ItemDefinition *pMainHand = m_pItemTable->get(member.equipment.mainHand);
+        if (pMainHand != nullptr && pMainHand->equipStat == "WeaponW")
+        {
+            std::swap(member.equipment.mainHand, member.equipment.wand);
+            std::swap(member.equipmentRuntime.mainHand, member.equipmentRuntime.wand);
+        }
+    }
 }
 
 void Party::setJournalQuestTable(const JournalQuestTable *pJournalQuestTable)
@@ -2719,6 +2750,7 @@ void Party::seed(const PartySeed &seed)
                  EquipmentSlot::OffHand,
                  EquipmentSlot::MainHand,
                  EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
                  EquipmentSlot::Armor,
                  EquipmentSlot::Helm,
                  EquipmentSlot::Belt,
@@ -4602,6 +4634,7 @@ int Party::inventoryItemCount(uint32_t objectDescriptionId, std::optional<size_t
             EquipmentSlot::OffHand,
             EquipmentSlot::MainHand,
             EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
             EquipmentSlot::Armor,
             EquipmentSlot::Helm,
             EquipmentSlot::Belt,
@@ -4929,6 +4962,8 @@ bool Party::tryEquipItemOnMember(
     const ItemDefinition *pItemDefinition = m_pItemTable != nullptr ? m_pItemTable->get(item.objectDescriptionId) : nullptr;
 
     if (pItemDefinition == nullptr
+        || (targetSlot == EquipmentSlot::MainHand && pItemDefinition->equipStat == "WeaponW")
+        || (targetSlot == EquipmentSlot::Wand && pItemDefinition->equipStat != "WeaponW")
         || !ItemRuntime::characterMeetsClassRestriction(*pMember, *pItemDefinition)
         || !ItemRuntime::characterMeetsRaceRestriction(*pMember, *pItemDefinition))
     {
@@ -5079,22 +5114,28 @@ bool Party::consumeEquippedWandCharge(size_t memberIndex)
 {
     Character *pMember = member(memberIndex);
 
-    if (pMember == nullptr || m_pItemTable == nullptr || pMember->equipment.mainHand == 0)
+    if (pMember == nullptr || m_pItemTable == nullptr)
     {
         return false;
     }
 
-    const ItemDefinition *pItemDefinition = m_pItemTable->get(pMember->equipment.mainHand);
+    const bool wandInMainHand = pMember->equipment.mainHand != 0
+        && m_pItemTable->get(pMember->equipment.mainHand) != nullptr
+        && m_pItemTable->get(pMember->equipment.mainHand)->equipStat == "WeaponW";
+    const EquipmentSlot slot = wandInMainHand ? EquipmentSlot::MainHand : EquipmentSlot::Wand;
+    const uint32_t itemId = ::OpenYAMM::Game::equippedItemId(pMember->equipment, slot);
+    const ItemDefinition *pItemDefinition = itemId != 0 ? m_pItemTable->get(itemId) : nullptr;
+    EquippedItemRuntimeState &runtime = equippedItemRuntimeState(pMember->equipmentRuntime, slot);
 
     if (pItemDefinition == nullptr
         || pItemDefinition->equipStat != "WeaponW"
-        || pMember->equipmentRuntime.mainHand.broken
-        || pMember->equipmentRuntime.mainHand.currentCharges == 0)
+        || runtime.broken
+        || runtime.currentCharges == 0)
     {
         return false;
     }
 
-    --pMember->equipmentRuntime.mainHand.currentCharges;
+    --runtime.currentCharges;
     return true;
 }
 
@@ -7552,6 +7593,7 @@ void Party::recordEverOwnedItemsFromCurrentState()
         EquipmentSlot::OffHand,
         EquipmentSlot::MainHand,
         EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
         EquipmentSlot::Armor,
         EquipmentSlot::Helm,
         EquipmentSlot::Belt,

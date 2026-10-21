@@ -1929,6 +1929,8 @@ uint32_t equippedItemId(const CharacterEquipment &equipment, EquipmentSlot slot)
             return equipment.mainHand;
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
         case EquipmentSlot::Armor:
             return equipment.armor;
         case EquipmentSlot::Helm:
@@ -1967,6 +1969,11 @@ std::optional<EquipmentSlot> characterEquipmentSlotForLayoutId(const std::string
     if (normalized == "characterdollbowslot")
     {
         return EquipmentSlot::Bow;
+    }
+
+    if (normalized == "characterdollwandslot")
+    {
+        return EquipmentSlot::Wand;
     }
 
     if (normalized == "characterdollrighthandslot")
@@ -2311,6 +2318,7 @@ bool isJewelryOverlayEquipmentSlot(EquipmentSlot slot)
         case EquipmentSlot::OffHand:
         case EquipmentSlot::MainHand:
         case EquipmentSlot::Bow:
+        case EquipmentSlot::Wand:
         case EquipmentSlot::Armor:
         case EquipmentSlot::Helm:
         case EquipmentSlot::Belt:
@@ -8641,10 +8649,11 @@ void GameplayPartyOverlayRenderer::renderCharacterOverlay(
             appendSignatureText(pCharacterDollEntry->rightHandOpenAsset);
             appendSignatureText(pCharacterDollEntry->rightHandHoldAsset);
 
-            const std::array<uint32_t, 9> visibleEquipmentIds = {
+            const std::array<uint32_t, 10> visibleEquipmentIds = {
                 pCharacter->equipment.offHand,
                 pCharacter->equipment.mainHand,
                 pCharacter->equipment.bow,
+                pCharacter->equipment.wand,
                 pCharacter->equipment.armor,
                 pCharacter->equipment.helm,
                 pCharacter->equipment.belt,
@@ -8652,10 +8661,11 @@ void GameplayPartyOverlayRenderer::renderCharacterOverlay(
                 pCharacter->equipment.gauntlets,
                 pCharacter->equipment.boots,
             };
-            const std::array<bool, 9> visibleEquipmentBrokenStates = {
+            const std::array<bool, 10> visibleEquipmentBrokenStates = {
                 pCharacter->equipmentRuntime.offHand.broken,
                 pCharacter->equipmentRuntime.mainHand.broken,
                 pCharacter->equipmentRuntime.bow.broken,
+                pCharacter->equipmentRuntime.wand.broken,
                 pCharacter->equipmentRuntime.armor.broken,
                 pCharacter->equipmentRuntime.helm.broken,
                 pCharacter->equipmentRuntime.belt.broken,

@@ -1,7 +1,9 @@
 #include "game/ui/GameplayHudRenderer.h"
 
 #include "game/gameplay/GameplayScreenRuntime.h"
+#include "game/gameplay/GameplayInputFrame.h"
 #include "game/gameplay/TurnBasedCombatRuntime.h"
+#include "game/ui/GameplayScrollMenu.h"
 #include "game/ui/GameplayUiSkin.h"
 
 #include <algorithm>
@@ -341,6 +343,14 @@ void renderContextAction(GameplayScreenRuntime &context, int width, int height)
     }
 }
 
+void renderSimpleTurnButton(
+    GameplayScreenRuntime &context,
+    const GameplayResolvedHudLayoutElement &rect,
+    bool hovered,
+    bool pressed,
+    bool selected,
+    const std::vector<std::string> &lines);
+
 void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
 {
     const std::optional<GameplayResolvedHudLayoutElement> buttonRect =
@@ -354,19 +364,198 @@ void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
     const bool pressed =
         context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::PassTurnButton;
-    GameplayUiSkin::renderPanel(context, *buttonRect, false, 0.32f);
-
-    UiLayoutManager::LayoutElement labelLayout = {};
-    labelLayout.fontName = "Fondamento";
-    labelLayout.textColorAbgr = pressed ? GameplayUiSkin::Gold : GameplayUiSkin::Ivory;
-    labelLayout.textAlignX = UiLayoutManager::TextAlignX::Center;
-    labelLayout.textAlignY = UiLayoutManager::TextAlignY::Middle;
-    labelLayout.textScale = 0.3333333f;
-    const std::vector<std::string> labelLines =
+    renderSimpleTurnButton(
+        context,
+        *buttonRect,
+        false,
+        pressed,
+        false,
         context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement
             ? std::vector<std::string>{"End", "Move"}
-            : std::vector<std::string>{"Pass"};
-    renderCenteredContextActionLabelLines(context, labelLayout, *buttonRect, labelLines);
+            : std::vector<std::string>{"Pass"});
+}
+
+void renderUseWandButton(GameplayScreenRuntime &context, int width, int height)
+{
+    const auto rect = context.resolveUseWandButton(width, height);
+    if (!rect) return;
+    const bool pressed = context.interactionState().gameplayHudClickLatch
+        && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::UseWandButton;
+    renderSimpleTurnButton(context, *rect, false, pressed, false, {"Use", "Wand"});
+}
+
+void renderSimpleTurnButton(
+    GameplayScreenRuntime &context,
+    const GameplayResolvedHudLayoutElement &rect,
+    bool hovered,
+    bool pressed,
+    bool selected,
+    const std::vector<std::string> &lines)
+{
+    const float plateSize = std::min(rect.width, rect.height);
+    const GameplayResolvedHudLayoutElement plate = {
+        rect.x + (rect.width - plateSize) * 0.5f,
+        rect.y + (rect.height - plateSize) * 0.5f,
+        plateSize,
+        plateSize,
+        rect.scale};
+    GameplayUiSkin::renderTexture(
+        context,
+        pressed ? "obsidian_touch_pressed" : selected ? "obsidian_touch_active"
+            : hovered ? "obsidian_touch_hover" : "obsidian_touch_normal",
+        plate);
+
+    UiLayoutManager::LayoutElement labelLayout = {};
+    labelLayout.fontName = "Lucida";
+    labelLayout.textColorAbgr = 0xffe5dcc7u;
+    labelLayout.textAlignX = UiLayoutManager::TextAlignX::Center;
+    labelLayout.textAlignY = UiLayoutManager::TextAlignY::Middle;
+    labelLayout.textScale = 0.7f;
+    if (pressed)
+    {
+        labelLayout.textPadY = rect.scale;
+    }
+    renderCenteredContextActionLabelLines(context, labelLayout, rect, lines);
+}
+
+void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
+{
+    if ((!context.interactionState().scrollMenuOpen && !context.interactionState().potionsMenuOpen)
+        || context.currentHudScreenState() != GameplayHudScreenState::Gameplay
+        || context.itemTable() == nullptr)
+    {
+        return;
+    }
+
+    const Party *pParty = context.partyReadOnly();
+    const bool potionsMenu = context.interactionState().potionsMenuOpen;
+    const std::optional<GameplayResolvedHudLayoutElement> button = context.resolveHudLayoutElement(
+        potionsMenu ? "OutdoorButtonPotions" : "OutdoorButtonScrolls", width, height, 0, 0);
+    if (pParty == nullptr || !button)
+    {
+        return;
+    }
+
+    const size_t maxVisibleRows = potionsMenu ? 4 : 8;
+    const float rowHeight = potionsMenu ? 64.0f : 30.0f;
+    const float menuWidth = potionsMenu ? 270.0f : 220.0f;
+    const std::vector<GameplayScrollMenuEntry> entries = potionsMenu
+        ? collectGameplayPotionMenuEntries(
+            *pParty, *context.itemTable(), context.mergedPotionSettingTable(), context.mergedReagentSettingTable())
+        : collectGameplayScrollMenuEntries(*pParty, *context.itemTable());
+    const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
+    const size_t maxScroll = entries.size() > visibleRows ? entries.size() - visibleRows : 0;
+    context.interactionState().scrollMenuScrollOffset =
+        std::min(context.interactionState().scrollMenuScrollOffset, maxScroll);
+    const float scale = button->scale;
+    const GameplayResolvedHudLayoutElement panel = {
+        button->x + button->width - menuWidth * scale,
+        button->y - rowHeight * static_cast<float>(visibleRows) * scale,
+        menuWidth * scale,
+        rowHeight * static_cast<float>(visibleRows) * scale,
+        scale};
+    GameplayUiSkin::renderPanel(context, panel, true, 0.6f, 238);
+
+    UiLayoutManager::LayoutElement label = {};
+    label.fontName = "Fondamento";
+    label.textColorAbgr = GameplayUiSkin::Ivory;
+    label.textAlignX = UiLayoutManager::TextAlignX::Left;
+    label.textAlignY = UiLayoutManager::TextAlignY::Middle;
+    const float baseTextScale = potionsMenu ? 0.48f : 0.38f;
+    label.textScale = baseTextScale;
+    label.textPadX = potionsMenu ? 52.0f : 32.0f;
+    const GameplayInputFrame *pInput = context.currentGameplayInputFrame();
+    for (size_t row = 0; row < visibleRows; ++row)
+    {
+        const GameplayResolvedHudLayoutElement rowRect = {
+            panel.x + 2 * scale,
+            panel.y + static_cast<float>(row) * rowHeight * scale + scale,
+            panel.width - 4 * scale,
+            (rowHeight - 1) * scale,
+            scale};
+        const size_t entryIndex = context.interactionState().scrollMenuScrollOffset + row;
+        const bool hasEntry = entryIndex < entries.size();
+        const float pointerX = pInput != nullptr ? pInput->pointerX : -1.0f;
+        const float pointerY = pInput != nullptr ? pInput->pointerY : -1.0f;
+        const bool hovered = hasEntry && pointerX >= rowRect.x && pointerX < rowRect.x + rowRect.width
+            && pointerY >= rowRect.y && pointerY < rowRect.y + rowRect.height;
+        GameplayUiSkin::renderPanel(context, rowRect, false, 0.12f, hovered ? 210 : 80);
+
+        if (hasEntry)
+        {
+            const ItemDefinition *pDefinition = context.itemTable()->get(entries[entryIndex].objectDescriptionId);
+            if (pDefinition != nullptr && !pDefinition->iconName.empty())
+            {
+                const std::optional<GameplayHudTextureHandle> itemIcon =
+                    context.gameplayUiRuntime().ensureItemIconTextureLoaded(pDefinition->iconName);
+                if (itemIcon)
+                {
+                    const float iconSize = 20.0f * scale;
+                    const float iconX = rowRect.x + 5.0f * scale;
+                    float iconWidth = iconSize;
+                    float iconHeight = iconSize;
+                    if (potionsMenu && itemIcon->width > 0 && itemIcon->height > 0)
+                    {
+                        const float maxWidth = 42.0f * scale;
+                        const float maxHeight = 54.0f * scale;
+                        const float aspect = static_cast<float>(itemIcon->width) / itemIcon->height;
+                        iconWidth = maxWidth;
+                        iconHeight = iconWidth / aspect;
+                        if (iconHeight > maxHeight)
+                        {
+                            iconHeight = maxHeight;
+                            iconWidth = iconHeight * aspect;
+                        }
+                    }
+                    const float iconY = rowRect.y + (rowRect.height - iconHeight) * 0.5f;
+                    context.submitHudTexturedQuad(*itemIcon, iconX, iconY, iconWidth, iconHeight);
+                }
+            }
+        }
+
+        const std::string text = hasEntry
+            ? entries[entryIndex].label
+                + (entries[entryIndex].quantity > 1
+                        ? " (x" + std::to_string(entries[entryIndex].quantity) + ")"
+                        : std::string{})
+            : (potionsMenu ? "No potions" : "No scrolls");
+        const float availableWidth = rowRect.width / scale - label.textPadX - 8.0f;
+        const float measuredWidth = context.measureHudTextWidth(label.fontName, text);
+        label.textScale = measuredWidth > availableWidth && measuredWidth > 0
+            ? baseTextScale * availableWidth / measuredWidth
+            : baseTextScale;
+        context.renderLayoutLabel(label, rowRect, text);
+    }
+}
+
+void renderItemMenuButton(
+    GameplayScreenRuntime &context,
+    int width,
+    int height,
+    const char *layoutId,
+    const char *labelText)
+{
+    if (context.currentHudScreenState() != GameplayHudScreenState::Gameplay)
+    {
+        return;
+    }
+
+    const std::optional<GameplayResolvedHudLayoutElement> rect =
+        context.resolveHudLayoutElement(layoutId, width, height, 0, 0);
+    if (!rect)
+    {
+        return;
+    }
+
+    const GameplayInputFrame *pInput = context.currentGameplayInputFrame();
+    const bool hovered = pInput != nullptr
+        && pInput->pointerX >= rect->x && pInput->pointerX < rect->x + rect->width
+        && pInput->pointerY >= rect->y && pInput->pointerY < rect->y + rect->height;
+    const bool pressed = hovered && pInput->leftMouseButton.held;
+    const bool selected = layoutId == std::string("OutdoorButtonScrolls")
+        ? context.interactionState().scrollMenuOpen
+        : context.interactionState().potionsMenuOpen;
+    renderSimpleTurnButton(context, *rect, hovered, pressed, selected, {labelText});
 }
 
 } // namespace
@@ -501,5 +690,9 @@ void GameplayHudRenderer::renderGameplayHud(GameplayScreenRuntime &context, int 
         renderContextAction(context, width, height);
     }
     renderPassTurnButton(context, width, height);
+    renderUseWandButton(context, width, height);
+    renderItemMenuButton(context, width, height, "OutdoorButtonScrolls", "Scrolls");
+    renderItemMenuButton(context, width, height, "OutdoorButtonPotions", "Potions");
+    renderScrollMenu(context, width, height);
 }
 } // namespace OpenYAMM::Game

@@ -1200,6 +1200,9 @@ void GameSession::renderGameplayUi(int width, int height)
                 gameplayMouseLookState.mouseLookActive
                     && !gameplayMouseLookState.cursorModeActive
                     && !pendingSpellCast.active,
+            .renderGameplayCursorOverlay =
+                gameplayMouseLookState.cursorModeActive
+                    && uiRenderState.canRenderHudOverlays,
             .renderActorInspectOverlay = uiRenderState.renderActorInspectOverlay,
             .renderDebugFallbacks = uiRenderState.renderDebugFallbacks,
         });

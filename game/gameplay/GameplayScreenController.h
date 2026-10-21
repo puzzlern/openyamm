@@ -129,6 +129,7 @@ struct GameplayStandardUiRenderConfig
     bool canRenderHudOverlays = false;
     bool renderGameplayHud = true;
     bool renderGameplayMouseLookOverlay = false;
+    bool renderGameplayCursorOverlay = false;
     bool renderActorInspectOverlay = true;
     bool renderDebugFallbacks = false;
 };

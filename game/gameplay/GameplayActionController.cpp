@@ -906,6 +906,53 @@ GameplayActionController::PartyAttackExecutionResult GameplayActionController::e
         return result;
     }
 
+    struct WandAttackEquipmentSwap
+    {
+        Character *pCharacter = nullptr;
+        uint32_t mainHand = 0;
+        EquippedItemRuntimeState mainHandRuntime = {};
+        bool active = false;
+
+        explicit WandAttackEquipmentSwap(Character &character) : pCharacter(&character)
+        {
+            mainHand = character.equipment.mainHand;
+            mainHandRuntime = character.equipmentRuntime.mainHand;
+            std::swap(character.equipment.mainHand, character.equipment.wand);
+            std::swap(character.equipmentRuntime.mainHand, character.equipmentRuntime.wand);
+            active = true;
+        }
+
+        ~WandAttackEquipmentSwap()
+        {
+            if (active)
+            {
+                std::swap(pCharacter->equipment.mainHand, pCharacter->equipment.wand);
+                std::swap(pCharacter->equipmentRuntime.mainHand, pCharacter->equipmentRuntime.wand);
+            }
+        }
+    };
+
+    std::optional<WandAttackEquipmentSwap> wandAttackEquipmentSwap;
+    if (config.forceWandAttack)
+    {
+        const bool wandInDedicatedSlot = pAttacker->equipment.wand != 0;
+        const uint32_t wandId = wandInDedicatedSlot
+            ? pAttacker->equipment.wand : pAttacker->equipment.mainHand;
+        const ItemDefinition *pWand = config.pItemTable != nullptr && wandId != 0
+            ? config.pItemTable->get(wandId) : nullptr;
+        const EquippedItemRuntimeState &wandRuntime = wandInDedicatedSlot
+            ? pAttacker->equipmentRuntime.wand : pAttacker->equipmentRuntime.mainHand;
+        if (pWand == nullptr || pWand->equipStat != "WeaponW"
+            || wandRuntime.broken || wandRuntime.currentCharges == 0)
+        {
+            return result;
+        }
+        if (wandInDedicatedSlot)
+        {
+            wandAttackEquipmentSwap.emplace(*pAttacker);
+        }
+    }
+
     const size_t actingMemberIndex = party.activeMemberIndex();
     result.attempted = true;
     result.actingMemberIndex = actingMemberIndex;
@@ -914,7 +961,9 @@ GameplayActionController::PartyAttackExecutionResult GameplayActionController::e
         party.clearPartyBuff(PartyBuffId::Invisibility);
     }
 
-    if (!pAttacker->attackSpellName.empty() && !lacksManaForAttackSpell(config, actingMemberIndex, *pAttacker))
+    if (!config.forceWandAttack
+        && !pAttacker->attackSpellName.empty()
+        && !lacksManaForAttackSpell(config, actingMemberIndex, *pAttacker))
     {
         AttackCastResult attackCastResult = {};
 

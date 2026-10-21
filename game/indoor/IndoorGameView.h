@@ -97,7 +97,7 @@ private:
     void presentPendingEventFeedback();
     std::optional<std::string> findCachedAssetPath(const std::string &directoryPath, const std::string &fileName) const;
     std::optional<std::vector<uint8_t>> readCachedBinaryFile(const std::string &assetPath) const;
-    void syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled);
+    void syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled, bool renderCursor = false);
     void syncCursorToGameplayCrosshair(SDL_Window *pWindow);
     void updateItemInspectOverlayState(int width, int height, const GameplayInputFrame &input);
     void updateActorInspectOverlayState(int width, int height, const GameplayInputFrame &input);

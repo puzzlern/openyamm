@@ -60,7 +60,10 @@ void OutdoorGameplayInputController::updateCameraFromInput(
     }
 
     const GameplaySharedInputFrameResult &sharedInputFrameResult = view.m_gameSession.sharedInputFrameResult();
-    view.syncGameplayMouseLookMode(pWindow, sharedInputFrameResult.mouseLookPolicy.mouseLookActive);
+    view.syncGameplayMouseLookMode(
+        pWindow,
+        sharedInputFrameResult.mouseLookPolicy.mouseLookActive,
+        sharedInputFrameResult.mouseLookPolicy.cursorModeActive);
 
     if (sharedInputFrameResult.journalInputConsumed)
     {

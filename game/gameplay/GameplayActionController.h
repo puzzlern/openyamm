@@ -130,6 +130,7 @@ public:
         uint32_t throwingAxeProjectileObjectId = 0;
         uint32_t blasterProjectileObjectId = 0;
         bool pressedThisFrame = false;
+        bool forceWandAttack = false;
         GameplaySpellActionController::TargetQueries targetQueries = {};
     };
 

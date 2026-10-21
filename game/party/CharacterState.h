@@ -52,6 +52,7 @@ enum class EquipmentSlot : uint8_t
     Ring4,
     Ring5,
     Ring6,
+    Wand,
 };
 
 static constexpr size_t CharacterConditionCount = static_cast<size_t>(CharacterCondition::Count);
@@ -110,6 +111,7 @@ struct CharacterEquipment
     uint32_t offHand = 0;
     uint32_t mainHand = 0;
     uint32_t bow = 0;
+    uint32_t wand = 0;
     uint32_t armor = 0;
     uint32_t helm = 0;
     uint32_t belt = 0;
@@ -146,6 +148,7 @@ struct CharacterEquipmentRuntimeState
     EquippedItemRuntimeState offHand = {};
     EquippedItemRuntimeState mainHand = {};
     EquippedItemRuntimeState bow = {};
+    EquippedItemRuntimeState wand = {};
     EquippedItemRuntimeState armor = {};
     EquippedItemRuntimeState helm = {};
     EquippedItemRuntimeState belt = {};

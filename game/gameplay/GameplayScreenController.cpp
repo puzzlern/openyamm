@@ -787,7 +787,9 @@ GameplayUiOverlayInputResult GameplayScreenController::handleStandardUiInput(
         || input.leftMouseButton.held
         || context.interactionState().gameplayHudClickLatch;
 #else
-        config.allowGameplayPointerInput;
+        config.allowGameplayPointerInput
+        || context.interactionState().scrollMenuOpen
+        || context.interactionState().potionsMenuOpen;
 #endif
 
     const bool canClickGameplayHudButtons =
@@ -1089,6 +1091,7 @@ void GameplayScreenController::renderStandardUi(
                     .hasActiveLootView = hasActiveLootView,
                     .activeEventDialog = context.activeEventDialog().isActive,
                     .renderGameplayMouseLookOverlay = config.renderGameplayMouseLookOverlay,
+                    .renderGameplayCursorOverlay = config.renderGameplayCursorOverlay,
                     .renderChestBelowHud = renderChestUi,
                     .renderChestAboveHud = renderChestUi,
                     .renderInventoryBelowHud = !deferDialogueShopInventoryOverlay,

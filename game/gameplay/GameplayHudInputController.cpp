@@ -2,10 +2,12 @@
 #include "game/ui/GameplayBuffHud.h"
 #include "game/gameplay/GameplayHudInputController.h"
 
+#include "game/gameplay/GameplayInputFrame.h"
 #include "game/gameplay/GameplayItemService.h"
 #include "game/gameplay/NpcFollowerRuntime.h"
 #include "game/gameplay/GameplayScreenRuntime.h"
 #include "game/party/SpellIds.h"
+#include "game/ui/GameplayScrollMenu.h"
 
 #include <SDL3/SDL.h>
 
@@ -333,6 +335,9 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
 {
     if (!config.allowInput || config.screenWidth <= 0 || config.screenHeight <= 0)
     {
+        context.interactionState().scrollMenuOpen = false;
+        context.interactionState().potionsMenuOpen = false;
+        context.interactionState().scrollMenuScrollOffset = 0;
         context.interactionState().gameplayHudClickLatch = false;
         context.interactionState().gameplayHudPressedTarget = {};
         context.interactionState().gameplayHudPressedContextActionActive = false;
@@ -346,12 +351,58 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
         config.leftButtonPressed
     };
 
+    const auto collectOpenMenuEntries = [&context]()
+    {
+        const Party *pParty = context.partyReadOnly();
+        const ItemTable *pItemTable = context.itemTable();
+        if (pParty == nullptr || pItemTable == nullptr)
+        {
+            return std::vector<GameplayScrollMenuEntry>{};
+        }
+        return context.interactionState().potionsMenuOpen
+            ? collectGameplayPotionMenuEntries(
+                *pParty, *pItemTable, context.mergedPotionSettingTable(), context.mergedReagentSettingTable())
+            : collectGameplayScrollMenuEntries(*pParty, *pItemTable);
+    };
+
+    if ((context.interactionState().scrollMenuOpen || context.interactionState().potionsMenuOpen)
+        && context.currentGameplayInputFrame() != nullptr
+        && context.partyReadOnly() != nullptr && context.itemTable() != nullptr)
+    {
+        const size_t maxVisibleRows = context.interactionState().potionsMenuOpen ? 4 : 8;
+        const float rowHeight = context.interactionState().potionsMenuOpen ? 64.0f : 30.0f;
+        const float menuWidth = context.interactionState().potionsMenuOpen ? 270.0f : 220.0f;
+        const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
+        const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
+        const size_t maxScroll = entries.size() > visibleRows ? entries.size() - visibleRows : 0;
+        const char *menuButtonId = context.interactionState().potionsMenuOpen
+            ? "OutdoorButtonPotions" : "OutdoorButtonScrolls";
+        const std::optional<GameplayResolvedHudLayoutElement> button =
+            context.resolveHudLayoutElement(menuButtonId, config.screenWidth, config.screenHeight, 0, 0);
+        const float menuHeight = rowHeight * static_cast<float>(visibleRows) * (button ? button->scale : 1.0f);
+        const float menuX = button ? button->x + button->width - menuWidth * button->scale : 0.0f;
+        const bool pointerOverMenu = button
+            && config.pointerX >= menuX
+            && config.pointerX < menuX + menuWidth * button->scale
+            && config.pointerY >= button->y - menuHeight
+            && config.pointerY < button->y;
+        const float wheel = context.currentGameplayInputFrame()->mouseWheelDelta;
+        if (pointerOverMenu && wheel != 0.0f)
+        {
+            const int delta = wheel > 0.0f ? -1 : 1;
+            const int next = static_cast<int>(context.interactionState().scrollMenuScrollOffset) + delta;
+            context.interactionState().scrollMenuScrollOffset =
+                static_cast<size_t>(std::clamp(next, 0, static_cast<int>(maxScroll)));
+        }
+    }
+
     handlePointerClickRelease(
         pointerState,
         context.interactionState().gameplayHudClickLatch,
         context.interactionState().gameplayHudPressedTarget,
         GameplayHudPointerTarget{},
-        [&context, &config, &pointerState](float pointerX, float pointerY) -> GameplayHudPointerTarget
+        [&context, &config, &pointerState, &collectOpenMenuEntries](float pointerX, float pointerY)
+            -> GameplayHudPointerTarget
         {
             const GameplayHudPointerTarget buffTarget = gameplayBuffHudTarget(
                 context, config.screenWidth, config.screenHeight, pointerX, pointerY);
@@ -359,20 +410,78 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
             {
                 return buffTarget;
             }
+            if (context.interactionState().scrollMenuOpen || context.interactionState().potionsMenuOpen)
+            {
+                const bool potionsMenu = context.interactionState().potionsMenuOpen;
+                const size_t maxVisibleRows = potionsMenu ? 4 : 8;
+                const float rowHeight = potionsMenu ? 64.0f : 30.0f;
+                const float menuWidth = potionsMenu ? 270.0f : 220.0f;
+                const char *menuButtonId = context.interactionState().potionsMenuOpen
+                    ? "OutdoorButtonPotions" : "OutdoorButtonScrolls";
+                const std::optional<GameplayResolvedHudLayoutElement> button =
+                    context.resolveHudLayoutElement(menuButtonId, config.screenWidth, config.screenHeight, 0, 0);
+                if (button)
+                {
+                    const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
+                    const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
+                    const GameplayResolvedHudLayoutElement panel = {
+                        button->x + button->width - menuWidth * button->scale,
+                        button->y - rowHeight * static_cast<float>(visibleRows) * button->scale,
+                        menuWidth * button->scale,
+                        rowHeight * static_cast<float>(visibleRows) * button->scale, button->scale};
+                    if (pointerX >= panel.x && pointerX < panel.x + panel.width
+                        && pointerY >= panel.y && pointerY < panel.y + panel.height)
+                    {
+                        const size_t row = static_cast<size_t>(
+                            (pointerY - panel.y) / (rowHeight * button->scale));
+                        const size_t entryIndex = context.interactionState().scrollMenuScrollOffset + row;
+                        return entryIndex < entries.size()
+                            ? GameplayHudPointerTarget{GameplayHudPointerTargetType::ScrollMenuItem, entryIndex}
+                            : GameplayHudPointerTarget{GameplayHudPointerTargetType::DismissScrollMenu};
+                    }
+                    if (pointerX >= button->x && pointerX < button->x + button->width
+                        && pointerY >= button->y && pointerY < button->y + button->height)
+                    {
+                        return {context.interactionState().potionsMenuOpen
+                            ? GameplayHudPointerTargetType::PotionsButton
+                            : GameplayHudPointerTargetType::ScrollsButton};
+                    }
+                    for (const auto &[buttonId, targetType] : {
+                             std::pair<const char *, GameplayHudPointerTargetType>{
+                                 "OutdoorButtonScrolls", GameplayHudPointerTargetType::ScrollsButton},
+                             {"OutdoorButtonPotions", GameplayHudPointerTargetType::PotionsButton}})
+                    {
+                        const std::optional<GameplayResolvedHudLayoutElement> otherButton =
+                            context.resolveHudLayoutElement(buttonId, config.screenWidth, config.screenHeight, 0, 0);
+                        if (otherButton && pointerX >= otherButton->x && pointerX < otherButton->x + otherButton->width
+                            && pointerY >= otherButton->y && pointerY < otherButton->y + otherButton->height)
+                        {
+                            return {targetType};
+                        }
+                    }
+                }
+                return {GameplayHudPointerTargetType::DismissScrollMenu};
+            }
             if (context.interactionState().partyBuffPopupOpen || context.interactionState().personalBuffPopupMember)
             {
                 return {GameplayHudPointerTargetType::DismissBuffs};
-            }
-            if (context.turnBasedCombatRuntime().active()
-                && pointerInsideHudElement(context, config, "ObsidianTurnDock", pointerX, pointerY))
-            {
-                return {GameplayHudPointerTargetType::TurnBasedToggleButton};
             }
             if (const std::optional<GameplayResolvedHudLayoutElement> passRect =
                     context.resolvePassTurnButton(config.screenWidth, config.screenHeight);
                 passRect && context.isPointerInsideResolvedElement(*passRect, pointerX, pointerY))
             {
                 return {GameplayHudPointerTargetType::PassTurnButton};
+            }
+            if (const std::optional<GameplayResolvedHudLayoutElement> wandRect =
+                    context.resolveUseWandButton(config.screenWidth, config.screenHeight);
+                wandRect && context.isPointerInsideResolvedElement(*wandRect, pointerX, pointerY))
+            {
+                return {GameplayHudPointerTargetType::UseWandButton};
+            }
+            if (context.turnBasedCombatRuntime().active()
+                && pointerInsideHudElement(context, config, "ObsidianTurnDock", pointerX, pointerY))
+            {
+                return {GameplayHudPointerTargetType::TurnBasedToggleButton};
             }
             const GameplayContextActionState &contextActionState = context.contextActionStateReadOnly();
             const bool hasDropHeldItemAction =
@@ -446,6 +555,8 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
                         "OutdoorStandardButtonOptions"),
                     GameplayHudPointerTargetType::MenuButton
                 },
+                {"OutdoorButtonScrolls", GameplayHudPointerTargetType::ScrollsButton},
+                {"OutdoorButtonPotions", GameplayHudPointerTargetType::PotionsButton},
                 {
                     activeGameplayButtonLayoutId(
                         context,
@@ -559,7 +670,7 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
             }
             return {};
         },
-        [&context](const GameplayHudPointerTarget &target)
+        [&context, &collectOpenMenuEntries](const GameplayHudPointerTarget &target)
         {
             switch (target.type)
             {
@@ -590,6 +701,8 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
                 context.journalScreenState().view = GameplayUiController::JournalView::Map;
                 break;
             case GameplayHudPointerTargetType::MenuButton:
+                context.interactionState().scrollMenuOpen = false;
+                context.interactionState().potionsMenuOpen = false;
                 if (context.pendingSpellTargetActive())
                 {
                     context.interactionState().gameplayHudSpellTargetCancelRequested = true;
@@ -598,6 +711,81 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
                 {
                     context.openMenuOverlay();
                 }
+                break;
+            case GameplayHudPointerTargetType::ScrollsButton:
+            case GameplayHudPointerTargetType::PotionsButton:
+                if (context.heldInventoryItem().active)
+                {
+                    context.setStatusBarEvent("Finish using the held item first");
+                }
+                else
+                {
+                    const bool openPotions = target.type == GameplayHudPointerTargetType::PotionsButton;
+                    const bool alreadyOpen = openPotions
+                        ? context.interactionState().potionsMenuOpen
+                        : context.interactionState().scrollMenuOpen;
+                    context.interactionState().scrollMenuOpen = !alreadyOpen && !openPotions;
+                    context.interactionState().potionsMenuOpen = !alreadyOpen && openPotions;
+                    context.interactionState().scrollMenuScrollOffset = 0;
+                }
+                break;
+            case GameplayHudPointerTargetType::ScrollMenuItem:
+            {
+                Party *pParty = context.party();
+                const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
+                if (!context.heldInventoryItem().active && pParty != nullptr && target.index < entries.size())
+                {
+                    const GameplayScrollMenuEntry &entry = entries[target.index];
+                    InventoryItem item = {};
+                    if (pParty->takeItemFromMemberInventoryCell(entry.memberIndex, entry.gridX, entry.gridY, item))
+                    {
+                        const InventoryItem originalItem = item;
+                        if (item.quantity > 1)
+                        {
+                            InventoryItem remainingItem = item;
+                            --remainingItem.quantity;
+                            item.quantity = 1;
+                            std::optional<InventoryItem> replacedItem;
+                            if (!pParty->tryPlaceItemInMemberInventoryCell(
+                                    entry.memberIndex,
+                                    remainingItem,
+                                    entry.gridX,
+                                    entry.gridY,
+                                    replacedItem))
+                            {
+                                pParty->tryAutoPlaceItemInMemberInventory(entry.memberIndex, originalItem);
+                                break;
+                            }
+                        }
+
+                        context.heldInventoryItem() = {};
+                        context.heldInventoryItem().active = true;
+                        context.heldInventoryItem().item = item;
+                        pParty->setHeldItemForQueries(item);
+                        context.interactionState().scrollMenuOpen = false;
+                        context.interactionState().potionsMenuOpen = false;
+                        context.interactionState().scrollMenuScrollOffset = 0;
+                        const size_t casterMemberIndex = pParty->activeMemberIndex();
+                        context.itemService().tryUseHeldItemOnPartyMember(context, casterMemberIndex, false);
+
+                        if (context.heldInventoryItem().active)
+                        {
+                            const InventoryItem unusedItem = context.heldInventoryItem().item;
+                            context.heldInventoryItem() = {};
+                            pParty->clearHeldItemForQueries();
+                            if (!pParty->tryAutoPlaceItemInMemberInventory(entry.memberIndex, unusedItem))
+                            {
+                                context.setStatusBarEvent("Could not return the unused item to inventory");
+                            }
+                        }
+                    }
+                }
+                break;
+            }
+            case GameplayHudPointerTargetType::DismissScrollMenu:
+                context.interactionState().scrollMenuOpen = false;
+                context.interactionState().potionsMenuOpen = false;
+                context.interactionState().scrollMenuScrollOffset = 0;
                 break;
             case GameplayHudPointerTargetType::RestButton:
                 context.openRestOverlay();
@@ -645,6 +833,9 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
                 break;
             case GameplayHudPointerTargetType::PassTurnButton:
                 context.passTurnBasedTurn();
+                break;
+            case GameplayHudPointerTargetType::UseWandButton:
+                context.interactionState().gameplayHudUseWandRequested = true;
                 break;
             case GameplayHudPointerTargetType::ContextActionButton:
             {

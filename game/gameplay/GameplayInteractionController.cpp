@@ -19,7 +19,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <sstream>
+#include <string_view>
 
 namespace OpenYAMM::Game
 {
@@ -41,6 +43,71 @@ constexpr uint32_t ArrowProjectileObjectId = 545;
 constexpr uint32_t ThrowingDaggerProjectileObjectId = 307;
 constexpr uint32_t ThrowingAxeProjectileObjectId = 309;
 constexpr uint32_t BlasterProjectileObjectId = 555;
+constexpr uint64_t GameplayCursorActionDurationNanoseconds = 180 * 1000 * 1000;
+
+bool containsCaseInsensitive(std::string_view value, std::string_view search)
+{
+    if (search.empty() || value.size() < search.size())
+    {
+        return false;
+    }
+
+    for (size_t offset = 0; offset + search.size() <= value.size(); ++offset)
+    {
+        bool matches = true;
+        for (size_t index = 0; index < search.size(); ++index)
+        {
+            const unsigned char valueCharacter = static_cast<unsigned char>(value[offset + index]);
+            const unsigned char searchCharacter = static_cast<unsigned char>(search[index]);
+            if (std::tolower(valueCharacter) != std::tolower(searchCharacter))
+            {
+                matches = false;
+                break;
+            }
+        }
+
+        if (matches)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+GameplayCursorType cursorTypeForWorldHit(const GameplayWorldHit &hit, bool clicking)
+{
+    if (hit.kind == GameplayWorldHitKind::WorldItem
+        || hit.kind == GameplayWorldHitKind::Chest
+        || hit.kind == GameplayWorldHitKind::Corpse)
+    {
+        return clicking ? GameplayCursorType::Grab : GameplayCursorType::Hand;
+    }
+
+    if (hit.kind == GameplayWorldHitKind::Actor && hit.actor && hit.actor->isFriendly)
+    {
+        return GameplayCursorType::Mouth;
+    }
+
+    if (hit.kind == GameplayWorldHitKind::EventTarget && hit.eventTarget)
+    {
+        const std::string_view name = hit.eventTarget->name;
+        if (containsCaseInsensitive(name, "fountain")
+            || containsCaseInsensitive(name, "barrel")
+            || containsCaseInsensitive(name, "well"))
+        {
+            return GameplayCursorType::Mouth;
+        }
+
+        if (hit.eventTarget->targetKind == GameplayWorldEventTargetKind::Mechanism
+            || containsCaseInsensitive(name, "door"))
+        {
+            return clicking ? GameplayCursorType::Knock : GameplayCursorType::Hand;
+        }
+    }
+
+    return GameplayCursorType::Hand;
+}
 
 // "Orange Barrel (+2 Intellect)": the effect of the hovered event once the party has the autonote recording it.
 void appendLearnedEventEffect(
@@ -893,7 +960,8 @@ void executePartyAttack(
     const GameplayInteractionController::HoverStateInput &standardHoverInput,
     const GameplaySpellActionController::TargetQueries &targetQueries,
     const GameplayActionController::AttackActionDecision &decision,
-    const GameplayWorldHit &currentHit)
+    const GameplayWorldHit &currentHit,
+    bool forceWandAttack)
 {
     if (!partyAttackInput.enabled)
     {
@@ -989,6 +1057,7 @@ void executePartyAttack(
             .throwingAxeProjectileObjectId = ThrowingAxeProjectileObjectId,
             .blasterProjectileObjectId = BlasterProjectileObjectId,
             .pressedThisFrame = decision.pressedThisFrame,
+            .forceWandAttack = forceWandAttack,
             .targetQueries = targetQueries,
         });
 
@@ -1019,6 +1088,7 @@ void clearWorldInteractionFrameState(
     pendingSpellCast.clickLatch = false;
     worldInteractionInputState.heldInventoryDropLatch = false;
     overlayInteractionState.activateInspectLatch = false;
+    overlayInteractionState.gameplayHudUseWandRequested = false;
     worldInteractionInputState.inspectMouseActivateLatch = false;
     worldInteractionInputState.pressedWorldHit = {};
     attackActionState.clear();
@@ -1470,6 +1540,7 @@ GameplayInteractionController::updateWorldInteractionFrame(
 
     if (worldInputBlocked)
     {
+        overlayInteractionState.gameplayCursorHoverType = GameplayCursorType::Hand;
 #if defined(__ANDROID__) || defined(OPENYAMM_IOS)
         const bool preserveHeldItemDropAction =
             heldItemActive
@@ -1809,6 +1880,13 @@ GameplayInteractionController::updateWorldInteractionFrame(
         };
 
     result.hover = updateHoverState(standardHoverInput, pWorldRuntime);
+    overlayInteractionState.gameplayCursorHoverType = cursorTypeForWorldHit(result.hover.worldHit, false);
+    if (input.leftMouseButton.pressed && cursorModeActive)
+    {
+        overlayInteractionState.gameplayCursorActionType = cursorTypeForWorldHit(result.hover.worldHit, true);
+        overlayInteractionState.gameplayCursorActionUntilNanoseconds =
+            currentTickNanoseconds + GameplayCursorActionDurationNanoseconds;
+    }
 
     if (runtime.settingsSnapshot().contextActionPopup && pWorldRuntime != nullptr)
     {
@@ -1985,12 +2063,15 @@ GameplayInteractionController::updateWorldInteractionFrame(
         runtime.clearContextActionState();
     }
 
+    const bool hudWandRequested = overlayInteractionState.gameplayHudUseWandRequested;
+    overlayInteractionState.gameplayHudUseWandRequested = false;
+    const bool forceWandAttack = hudWandRequested || input.action(KeyboardAction::UseWand).pressed;
     const GameplayActionController::AttackActionDecision attackActionDecision =
         GameplayActionController::updateAttackAction(
             attackActionState,
             quickSpellState,
             GameplayActionController::AttackActionConfig{
-                .attackPressed = pointerPolicy.attackPressed,
+                .attackPressed = pointerPolicy.attackPressed || forceWandAttack,
                 .hasReadyMember = hasReadyMember,
             });
 
@@ -2012,7 +2093,8 @@ GameplayInteractionController::updateWorldInteractionFrame(
             standardHoverInput,
             targetQueries,
             attackActionDecision,
-            attackHit);
+            attackHit,
+            forceWandAttack);
     }
 
     runtime.setStatusBarHoverText(result.hover.statusText);

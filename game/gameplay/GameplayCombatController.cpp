@@ -52,6 +52,7 @@ constexpr EquipmentSlot BreakItemEquipmentSlots[] = {
     EquipmentSlot::OffHand,
     EquipmentSlot::MainHand,
     EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
     EquipmentSlot::Armor,
     EquipmentSlot::Helm,
     EquipmentSlot::Belt,

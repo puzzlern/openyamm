@@ -538,3 +538,12 @@ bindings:
 - id: double_speed
   name: Toggle double speed
   group: System
+- id: scrolls_menu
+  name: Open scrolls menu
+  group: Combat
+- id: potions_menu
+  name: Open potions menu
+  group: Combat
+- id: use_wand
+  name: Use equipped wand
+  group: Combat

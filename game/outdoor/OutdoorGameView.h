@@ -684,7 +684,7 @@ private:
     bool beginSaveWithPreview(const std::filesystem::path &path, const std::string &saveName, bool closeUiOnSuccess);
     void clearWorldInteractionInputLatches();
     float innRestDurationMinutes(uint32_t houseId) const;
-    void syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled);
+    void syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled, bool renderCursor = false);
     void syncCursorToGameplayCrosshair(SDL_Window *pWindow = nullptr);
     void refreshViewDistanceCache();
     const BillboardTextureHandle *findBillboardTexture(const std::string &textureName, int16_t paletteId) const;

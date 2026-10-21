@@ -34,10 +34,11 @@ public:
         int width,
         int height);
 
-    static void renderGameplayMouseLookOverlay(
+    static void renderGameplayPointerOverlay(
         GameplayScreenRuntime &context,
         int width,
         int height,
-        bool active);
+        bool active,
+        bool renderCursor);
 };
 } // namespace OpenYAMM::Game

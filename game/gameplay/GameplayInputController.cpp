@@ -151,7 +151,7 @@ GameplayMouseLookPolicyResult GameplayInputController::updateGameplayMouseLookPo
     GameplayScreenState::GameplayMouseLookState &state,
     const GameplayMouseLookPolicyConfig &config)
 {
-    const bool cursorModeActive = config.mouseLookAllowed && config.rightMousePressed;
+    const bool cursorModeActive = config.forceCursorMode || (config.mouseLookAllowed && config.rightMousePressed);
     const bool mouseLookActive = config.mouseLookAllowed && !cursorModeActive;
 
     state.cursorModeActive = cursorModeActive;
@@ -272,6 +272,48 @@ void GameplayInputController::handleStandardUiHotkeys(
         && !houseShopActive
         && !houseBankInputActive
         && !config.blockMenuToggle;
+
+    const bool canToggleScrollMenu =
+        gameplayHudActive
+        && !activeEventDialog
+        && !hasActiveLootView
+        && !characterScreenOpen
+        && !spellbookActive
+        && !restActive
+        && !menuActive
+        && !controlsActive
+        && !keyboardActive
+        && !videoOptionsActive
+        && !saveGameActive
+        && !loadGameActive
+        && !journalActive
+        && !quickReferenceActive
+        && !context.inventoryNestedOverlay().active
+        && !houseShopActive
+        && !houseBankInputActive;
+
+    const bool scrollsMenuKeyHeld =
+        isActionHeld(context, KeyboardAction::Scrolls, config.pInputFrame, config.pKeyboardState);
+    const bool potionsMenuKeyHeld =
+        isActionHeld(context, KeyboardAction::Potions, config.pInputFrame, config.pKeyboardState);
+    if (canToggleScrollMenu && (scrollsMenuKeyHeld || potionsMenuKeyHeld))
+    {
+        if (!context.interactionState().itemMenuToggleLatch)
+        {
+            const bool openScrolls = scrollsMenuKeyHeld;
+            const bool alreadyOpen = openScrolls
+                ? context.interactionState().scrollMenuOpen
+                : context.interactionState().potionsMenuOpen;
+            context.interactionState().scrollMenuOpen = !alreadyOpen && openScrolls;
+            context.interactionState().potionsMenuOpen = !alreadyOpen && !openScrolls;
+            context.interactionState().scrollMenuScrollOffset = 0;
+        }
+        context.interactionState().itemMenuToggleLatch = true;
+    }
+    else
+    {
+        context.interactionState().itemMenuToggleLatch = false;
+    }
 
     if (config.pKeyboardState != nullptr)
     {
@@ -609,6 +651,8 @@ GameplaySharedInputFrameResult GameplayInputController::updateSharedGameplayInpu
             GameplayMouseLookPolicyConfig{
                 .mouseLookAllowed = gameplayMouseLookAllowed,
                 .rightMousePressed = config.rightButtonPressed,
+                .forceCursorMode = context.interactionState().scrollMenuOpen
+                    || context.interactionState().potionsMenuOpen,
             });
 
     const bool canToggleAdventurersInn =
