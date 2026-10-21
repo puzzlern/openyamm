@@ -742,6 +742,8 @@ const char *traceEquipmentSlotName(EquipmentSlot slot)
             return "MainHand";
         case EquipmentSlot::Bow:
             return "Bow";
+        case EquipmentSlot::Wand:
+            return "Wand";
         case EquipmentSlot::Armor:
             return "Armor";
         case EquipmentSlot::Helm:
@@ -773,12 +775,13 @@ const char *traceEquipmentSlotName(EquipmentSlot slot)
     return "Unknown";
 }
 
-std::array<EquipmentSlot, 16> traceEquipmentSlots()
+std::array<EquipmentSlot, 17> traceEquipmentSlots()
 {
     return {
         EquipmentSlot::OffHand,
         EquipmentSlot::MainHand,
         EquipmentSlot::Bow,
+        EquipmentSlot::Wand,
         EquipmentSlot::Armor,
         EquipmentSlot::Helm,
         EquipmentSlot::Belt,
@@ -805,6 +808,8 @@ uint32_t equipmentItemId(const CharacterEquipment &equipment, EquipmentSlot slot
             return equipment.mainHand;
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
         case EquipmentSlot::Armor:
             return equipment.armor;
         case EquipmentSlot::Helm:

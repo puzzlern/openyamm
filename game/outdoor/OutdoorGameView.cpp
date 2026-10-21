@@ -1235,6 +1235,8 @@ uint32_t equippedItemId(const CharacterEquipment &equipment, EquipmentSlot slot)
 
         case EquipmentSlot::Bow:
             return equipment.bow;
+        case EquipmentSlot::Wand:
+            return equipment.wand;
 
         case EquipmentSlot::Armor:
             return equipment.armor;
@@ -1378,6 +1380,8 @@ const char *equipmentSlotName(EquipmentSlot slot)
 
         case EquipmentSlot::Bow:
             return "Bow";
+        case EquipmentSlot::Wand:
+            return "Wand";
 
         case EquipmentSlot::Armor:
             return "Armor";
@@ -3399,7 +3403,7 @@ void OutdoorGameView::shutdown()
         m_lightGrid.destroy();
     }
     m_lightGridBinding.destroy(Engine::BgfxContext::isBgfxInitialized());
-    syncGameplayMouseLookMode(SDL_GetMouseFocus(), false);
+    syncGameplayMouseLookMode(SDL_GetMouseFocus(), false, false);
     GameplayScreenRuntime &screenRuntime = m_gameSession.gameplayScreenRuntime();
     GameplayScreenState &gameplayScreenState = m_gameSession.gameplayScreenState();
     PendingSpellCastState &pendingSpellCast = gameplayScreenState.pendingSpellTarget();
@@ -3978,7 +3982,7 @@ float OutdoorGameView::cameraPitchRadians() const
     return m_cameraPitchRadians;
 }
 
-void OutdoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled)
+void OutdoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled, bool renderCursor)
 {
     const bool windowFocused = windowHasInputFocus(pWindow);
     const bool effectiveEnabled = enabled && windowFocused;
@@ -4027,6 +4031,7 @@ void OutdoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enable
         m_lastGameplayMouseLookCursorSyncTicks = 0;
     }
 
+    (void)renderCursor;
     if (effectiveEnabled)
     {
         SDL_HideCursor();

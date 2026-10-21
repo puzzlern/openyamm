@@ -21,7 +21,7 @@ namespace OpenYAMM::Game
 {
 namespace
 {
-constexpr uint32_t SaveVersion = 88;
+constexpr uint32_t SaveVersion = 89;
 constexpr uint32_t SaveVersionAttackSpell = 19;
 constexpr uint32_t SaveVersionIndoorCorpseViews = 21;
 constexpr uint32_t SaveVersionIndoorChestViews = 22;
@@ -680,6 +680,7 @@ void writeValue(BinaryWriter &writer, const CharacterEquipment &value)
     writeValue(writer, value.offHand);
     writeValue(writer, value.mainHand);
     writeValue(writer, value.bow);
+    writeValue(writer, value.wand);
     writeValue(writer, value.armor);
     writeValue(writer, value.helm);
     writeValue(writer, value.belt);
@@ -700,6 +701,7 @@ bool readValue(BinaryReader &reader, CharacterEquipment &value)
     return readValue(reader, value.offHand)
         && readValue(reader, value.mainHand)
         && readValue(reader, value.bow)
+        && (reader.version() < 89 || readValue(reader, value.wand))
         && readValue(reader, value.armor)
         && readValue(reader, value.helm)
         && readValue(reader, value.belt)
@@ -750,6 +752,7 @@ void writeValue(BinaryWriter &writer, const CharacterEquipmentRuntimeState &valu
     writeValue(writer, value.offHand);
     writeValue(writer, value.mainHand);
     writeValue(writer, value.bow);
+    writeValue(writer, value.wand);
     writeValue(writer, value.armor);
     writeValue(writer, value.helm);
     writeValue(writer, value.belt);
@@ -770,6 +773,7 @@ bool readValue(BinaryReader &reader, CharacterEquipmentRuntimeState &value)
     return readValue(reader, value.offHand)
         && readValue(reader, value.mainHand)
         && readValue(reader, value.bow)
+        && (reader.version() < 89 || readValue(reader, value.wand))
         && readValue(reader, value.armor)
         && readValue(reader, value.helm)
         && readValue(reader, value.belt)

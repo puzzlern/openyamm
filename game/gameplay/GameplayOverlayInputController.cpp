@@ -1544,11 +1544,13 @@ bool GameplayOverlayInputController::handleKeyboardOverlayInput(
 
                 const float rowX = keyboardLayout->labelColumnX(definition.column);
                 const float rowY = keyboardLayout->rowY(definition.row);
+                const float rowHeight = definition.row >= 8
+                    ? 21.0f * keyboardLayout->rootScale : keyboardLayout->rowHeight;
 
                 if (pointerX < rowX
                     || pointerX >= rowX + keyboardLayout->rowWidth(definition.column)
                     || pointerY < rowY
-                    || pointerY >= rowY + keyboardLayout->rowHeight)
+                    || pointerY >= rowY + rowHeight)
                 {
                     continue;
                 }

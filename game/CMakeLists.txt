@@ -240,6 +240,7 @@ add_library(openyamm_game STATIC
     ui/HouseShopLayout.cpp
     ui/EnemyHealthBarRenderer.cpp
     ui/GameplayHudRenderer.cpp
+    ui/GameplayScrollMenu.cpp
     ui/GameplayUiSkin.cpp
     ui/GameplayBuffHud.cpp
     ui/GameplayHudCommon.cpp

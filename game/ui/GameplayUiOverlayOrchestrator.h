@@ -41,6 +41,7 @@ struct GameplayUiOverlayRenderConfig
     bool hasActiveLootView = false;
     bool activeEventDialog = false;
     bool renderGameplayMouseLookOverlay = false;
+    bool renderGameplayCursorOverlay = false;
     bool renderChestBelowHud = false;
     bool renderChestAboveHud = false;
     bool renderInventoryBelowHud = false;

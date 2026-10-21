@@ -10,6 +10,7 @@
 #include "game/gameplay/GameplayScreenRuntime.h"
 #include "game/ui/SpellbookUiLayout.h"
 
+#include <SDL3/SDL.h>
 #include <bx/math.h>
 
 #include <algorithm>
@@ -17,6 +18,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <string_view>
 #include <unordered_set>
 
 namespace OpenYAMM::Game
@@ -1165,13 +1167,14 @@ void GameplayHudOverlaySupport::updateSpellInspectOverlay(
     }
 }
 
-void GameplayHudOverlaySupport::renderGameplayMouseLookOverlay(
+void GameplayHudOverlaySupport::renderGameplayPointerOverlay(
     GameplayScreenRuntime &context,
     int width,
     int height,
-    bool active)
+    bool active,
+    bool renderCursor)
 {
-    if (!active || width <= 0 || height <= 0)
+    if ((!active && !renderCursor) || width <= 0 || height <= 0)
     {
         return;
     }
@@ -1194,42 +1197,50 @@ void GameplayHudOverlaySupport::renderGameplayMouseLookOverlay(
     const GameplayUiViewportRect uiViewport = GameplayHudCommon::computeUiViewportRect(width, height);
     const float baseScale = std::min(uiViewport.width / HudReferenceWidth, uiViewport.height / HudReferenceHeight);
     const float overlayScale = std::clamp(baseScale, 0.75f, MaxUiScale);
-    const float centerX = std::round(static_cast<float>(width) * 0.5f);
-    const float centerY = std::round(static_cast<float>(height) * 0.5f);
-    const float armLength = std::round(3.0f * overlayScale);
-    const float outlineWidth = 1.0f;
-    const float armGap = std::max(outlineWidth + 1.0f, std::round(1.0f * overlayScale));
-    const float stroke = std::max(1.0f, std::round(1.0f * overlayScale));
-    const uint32_t dotColor = packHudColorAbgr(255, 250, 224);
-    const uint32_t outlineColor = packHudColorAbgr(16, 20, 17);
-    const std::optional<GameplayHudPaletteColor> dotColorTexel =
-        context.gameplayUiRuntime().ensureHudPaletteColor(dotColor);
-    const std::optional<GameplayHudPaletteColor> outlineColorTexel =
-        context.gameplayUiRuntime().ensureHudPaletteColor(outlineColor);
+    std::vector<GameplayHudBatchQuad> quads;
 
-    if (!dotColorTexel || !outlineColorTexel)
+    if (active)
     {
-        return;
+        const float centerX = std::round(static_cast<float>(width) * 0.5f);
+        const float centerY = std::round(static_cast<float>(height) * 0.5f);
+        const float armLength = std::round(3.0f * overlayScale);
+        const float outlineWidth = 1.0f;
+        const float armGap = std::max(outlineWidth + 1.0f, std::round(1.0f * overlayScale));
+        const float stroke = std::max(1.0f, std::round(1.0f * overlayScale));
+        const std::optional<GameplayHudPaletteColor> dotColorTexel =
+            context.gameplayUiRuntime().ensureHudPaletteColor(packHudColorAbgr(255, 250, 224));
+        const std::optional<GameplayHudPaletteColor> outlineColorTexel =
+            context.gameplayUiRuntime().ensureHudPaletteColor(packHudColorAbgr(16, 20, 17));
+
+        if (dotColorTexel && outlineColorTexel)
+        {
+            // Keep the aiming center open, with a complete dark contour on every ivory arm.
+            const float outlineStroke = stroke + outlineWidth * 2.0f;
+            const float outlineArm = armLength + outlineWidth * 2.0f;
+            quads = {
+                gameplayHudPaletteQuad(*outlineColorTexel, centerX - stroke * 0.5f - outlineWidth,
+                    centerY - armGap - armLength - outlineWidth, outlineStroke, outlineArm),
+                gameplayHudPaletteQuad(*outlineColorTexel, centerX - stroke * 0.5f - outlineWidth,
+                    centerY + armGap - outlineWidth, outlineStroke, outlineArm),
+                gameplayHudPaletteQuad(*outlineColorTexel, centerX - armGap - armLength - outlineWidth,
+                    centerY - stroke * 0.5f - outlineWidth, outlineArm, outlineStroke),
+                gameplayHudPaletteQuad(*outlineColorTexel, centerX + armGap - outlineWidth,
+                    centerY - stroke * 0.5f - outlineWidth, outlineArm, outlineStroke),
+                gameplayHudPaletteQuad(*dotColorTexel, centerX - stroke * 0.5f, centerY - armGap - armLength,
+                    stroke, armLength),
+                gameplayHudPaletteQuad(*dotColorTexel, centerX - stroke * 0.5f, centerY + armGap, stroke, armLength),
+                gameplayHudPaletteQuad(*dotColorTexel, centerX - armGap - armLength, centerY - stroke * 0.5f,
+                    armLength, stroke),
+                gameplayHudPaletteQuad(*dotColorTexel, centerX + armGap, centerY - stroke * 0.5f, armLength, stroke)};
+        }
     }
 
-    // Keep the aiming center open, with a complete dark contour on every ivory arm.
-    const float outlineStroke = stroke + outlineWidth * 2.0f;
-    const float outlineArm = armLength + outlineWidth * 2.0f;
-    const std::vector<GameplayHudBatchQuad> quads = {
-        gameplayHudPaletteQuad(*outlineColorTexel, centerX - stroke * 0.5f - outlineWidth,
-            centerY - armGap - armLength - outlineWidth, outlineStroke, outlineArm),
-        gameplayHudPaletteQuad(*outlineColorTexel, centerX - stroke * 0.5f - outlineWidth,
-            centerY + armGap - outlineWidth, outlineStroke, outlineArm),
-        gameplayHudPaletteQuad(*outlineColorTexel, centerX - armGap - armLength - outlineWidth,
-            centerY - stroke * 0.5f - outlineWidth, outlineArm, outlineStroke),
-        gameplayHudPaletteQuad(*outlineColorTexel, centerX + armGap - outlineWidth,
-            centerY - stroke * 0.5f - outlineWidth, outlineArm, outlineStroke),
-        gameplayHudPaletteQuad(*dotColorTexel, centerX - stroke * 0.5f, centerY - armGap - armLength,
-            stroke, armLength),
-        gameplayHudPaletteQuad(*dotColorTexel, centerX - stroke * 0.5f, centerY + armGap, stroke, armLength),
-        gameplayHudPaletteQuad(*dotColorTexel, centerX - armGap - armLength, centerY - stroke * 0.5f,
-            armLength, stroke),
-        gameplayHudPaletteQuad(*dotColorTexel, centerX + armGap, centerY - stroke * 0.5f, armLength, stroke)};
-    context.submitHudQuadBatch(quads);
+    // Cursor mode now uses the platform cursor. Only the crosshair is drawn here.
+    (void)renderCursor;
+
+    if (!quads.empty())
+    {
+        context.submitHudQuadBatch(quads);
+    }
 }
 } // namespace OpenYAMM::Game

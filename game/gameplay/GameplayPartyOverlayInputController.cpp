@@ -2192,6 +2192,7 @@ void GameplayPartyOverlayInputController::handleCharacterOverlayInput(
 
             static constexpr CharacterEquipmentSlotTarget EquipmentSlotTargets[] = {
                 {"CharacterDollBowSlot", EquipmentSlot::Bow, false},
+                {"CharacterDollWandSlot", EquipmentSlot::Wand, false},
                 {"CharacterDollRightHandSlot", EquipmentSlot::MainHand, false},
                 {"CharacterDollLeftHandSlot", EquipmentSlot::OffHand, false},
                 {"CharacterDollArmorSlot", EquipmentSlot::Armor, false},

@@ -26,6 +26,7 @@ struct GameplayMouseLookPolicyConfig
 {
     bool mouseLookAllowed = false;
     bool rightMousePressed = false;
+    bool forceCursorMode = false;
 };
 
 struct GameplayMouseLookPolicyResult

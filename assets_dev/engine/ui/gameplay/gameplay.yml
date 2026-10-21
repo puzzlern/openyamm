@@ -927,7 +927,7 @@ elements:
     anchor: top_left
     offset_x: 144
     offset_y: 0
-    width: 120
+    width: 180
     height: 26
     children:
     - id: OutdoorButtonBooks
@@ -1007,6 +1007,34 @@ elements:
           default: obsidian_options
       interactive: true
   notes: One shared resource/command strip. Command actions are icon-only; fullscreen bars retain their own layout.
+- id: OutdoorButtonScrolls
+  anchor_space: screen
+  anchor: bottom_right
+  offset_x: -68
+  offset_y: -12.266667
+  width: 52
+  height: 39.466667
+  scale:
+    min: 0.6
+    max: 8.0
+    reference_width: 1024
+  interactive: true
+  z_index: 240
+  notes: Scroll inventory control opposite the turn dock.
+- id: OutdoorButtonPotions
+  anchor_space: screen
+  anchor: bottom_right
+  offset_x: -8
+  offset_y: -12.266667
+  width: 52
+  height: 39.466667
+  scale:
+    min: 0.6
+    max: 8.0
+    reference_width: 1024
+  interactive: true
+  z_index: 240
+  notes: Potion inventory control opposite the turn dock.
 - id: ObsidianHeroBuffPanel
   anchor_space: screen
   anchor: top_left
@@ -1581,7 +1609,7 @@ elements:
   anchor: bottom_left
   offset_x: 14.933333
   offset_y: -15.466667
-  width: 69.333333
+  width: 184.0
   height: 33.066667
   children:
   - id: ObsidianTurnPlate
@@ -1626,6 +1654,14 @@ elements:
     height: 39.466667
     interactive: true
     notes: Pass / End Movement, attached right of the turn plate while the party can pass.
+  - id: ObsidianTurnUseWandButton
+    anchor: top_left
+    offset_x: 124
+    offset_y: -3.2
+    width: 54
+    height: 39.466667
+    interactive: true
+    notes: Use the equipped wand.
   interactive: true
   visible: false
   anchor_space: screen
@@ -1650,7 +1686,7 @@ elements:
   anchor: bottom_center
   offset_x: 0.0
   offset_y: -130.133333
-  width: 184.0
+  width: 192.0
   height: 96.0
   visible: false
   notes: Live selected owner's effects. Opens from medallion without changing selection.

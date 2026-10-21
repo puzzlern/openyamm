@@ -1153,7 +1153,10 @@ void IndoorGameView::render(int width, int height, const GameplayInputFrame &inp
     updateItemInspectOverlayState(width, height, input);
 
     const GameplaySharedInputFrameResult &sharedInputFrameResult = m_gameSession.sharedInputFrameResult();
-    syncGameplayMouseLookMode(pWindow, sharedInputFrameResult.mouseLookPolicy.mouseLookActive);
+    syncGameplayMouseLookMode(
+        pWindow,
+        sharedInputFrameResult.mouseLookPolicy.mouseLookActive,
+        sharedInputFrameResult.mouseLookPolicy.cursorModeActive && m_renderGameplayUiThisFrame);
 
     if (m_pIndoorRenderer != nullptr)
     {
@@ -1356,7 +1359,7 @@ GameplayWorldUiRenderState IndoorGameView::gameplayUiRenderState(int width, int 
 
 void IndoorGameView::shutdown()
 {
-    syncGameplayMouseLookMode(SDL_GetMouseFocus(), false);
+    syncGameplayMouseLookMode(SDL_GetMouseFocus(), false, false);
 
     if (m_pIndoorSceneRuntime != nullptr)
     {
@@ -1961,7 +1964,7 @@ const GameSettings &IndoorGameView::settingsSnapshot() const
     return m_settings;
 }
 
-void IndoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled)
+void IndoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled, bool renderCursor)
 {
     const bool windowFocused = windowHasInputFocus(pWindow);
     const bool effectiveEnabled = enabled && windowFocused;
@@ -2010,6 +2013,7 @@ void IndoorGameView::syncGameplayMouseLookMode(SDL_Window *pWindow, bool enabled
         m_lastGameplayMouseLookCursorSyncTicks = 0;
     }
 
+    (void)renderCursor;
     if (effectiveEnabled)
     {
         SDL_HideCursor();

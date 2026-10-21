@@ -23,6 +23,16 @@ GameplayUiOverlayInputResult GameplayUiOverlayOrchestrator::handleStandardOverla
     const GameplayInputFrame &input,
     const GameplayUiOverlayInputConfig &config)
 {
+    if (input.leftMouseButton.pressed && input.rightMouseButton.held)
+    {
+        GameplayOverlayInteractionState &interactionState = overlayContext.interactionState();
+        interactionState.gameplayCursorActionType = config.activeEventDialog
+            ? GameplayCursorType::Mouth
+            : interactionState.gameplayCursorHoverType;
+        interactionState.gameplayCursorActionUntilNanoseconds =
+            SDL_GetTicksNS() + 180 * 1000 * 1000;
+    }
+
     GameplayOverlayInputController::handleLootOverlayInput(
         overlayContext,
         input,
@@ -239,11 +249,12 @@ void GameplayUiOverlayOrchestrator::renderStandardOverlays(
             GameplayPartyOverlayRenderer::renderItemInspectOverlay(overlayContext, width, height);
         }
         recordStage(&GameplayUiOverlayFramePerformanceDiagnostics::itemInspectNanoseconds);
-        GameplayHudOverlaySupport::renderGameplayMouseLookOverlay(
+        GameplayHudOverlaySupport::renderGameplayPointerOverlay(
             overlayContext,
             width,
             height,
-            config.renderGameplayMouseLookOverlay);
+            config.renderGameplayMouseLookOverlay,
+            config.renderGameplayCursorOverlay);
         recordStage(&GameplayUiOverlayFramePerformanceDiagnostics::mouseLookNanoseconds);
 
         finishDiagnostics();
