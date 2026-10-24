@@ -388,7 +388,36 @@ struct TurnButtonContent
     uint32_t badgeColorAbgr = 0;
     // Marks a button that opens a menu upwards.
     bool menuArrow = false;
+    // A soft gold halo behind the icon, to lift busy art (spellbook illustrations) off the plate.
+    bool iconGlow = false;
 };
+
+// A soft radial glow: nested translucent ellipses, each built from one-pixel-ish horizontal strips, so the overlaps
+// brighten towards the centre. The HUD has no blur or radial texture to draw this with.
+void renderSoftGlow(GameplayScreenRuntime &context, float centerX, float centerY, float radiusX, float radiusY)
+{
+    const std::optional<GameplayHudPaletteColor> color =
+        context.gameplayUiRuntime().ensureHudPaletteColor(0x1e93c7e4u); // GameplayUiSkin::Gold, faint.
+    if (!color || radiusX <= 0.0f || radiusY <= 0.0f)
+    {
+        return;
+    }
+    std::vector<GameplayHudBatchQuad> quads;
+    for (const float fraction : {1.0f, 0.85f, 0.7f, 0.55f, 0.4f, 0.25f})
+    {
+        const float layerRadiusY = radiusY * fraction;
+        const int rows = std::max(4, static_cast<int>(std::ceil(2.0f * layerRadiusY / 1.5f)));
+        const float rowHeight = 2.0f * layerRadiusY / static_cast<float>(rows);
+        for (int row = 0; row < rows; ++row)
+        {
+            const float t = ((static_cast<float>(row) + 0.5f) * rowHeight - layerRadiusY) / layerRadiusY;
+            const float halfWidth = radiusX * fraction * std::sqrt(std::max(0.0f, 1.0f - t * t));
+            quads.push_back(gameplayHudPaletteQuad(*color, centerX - halfWidth,
+                centerY - layerRadiusY + static_cast<float>(row) * rowHeight, 2.0f * halfWidth, rowHeight));
+        }
+    }
+    context.submitHudQuadBatch(quads);
+}
 
 // The turn indicator, Pass, wand, scroll and potion buttons share one look: the turn plate art, an icon on the left,
 // and the indicator's two text rows (ObsidianTurnPhase above ObsidianTurnDetail) on the right. The plate art has no
@@ -410,6 +439,11 @@ void renderTurnButton(
     const float iconWidth = 26.0f * scale;
     const float iconHeight = rect.height - 8.0f * scale;
     const std::optional<GameplayHudTextureHandle> &icon = content.icon;
+    if (icon && content.iconGlow)
+    {
+        // Kept inside the plate: the icon box sits 5 units in from the left edge.
+        renderSoftGlow(context, iconX + iconWidth * 0.5f, iconY + iconHeight * 0.5f, 17.0f * scale, 15.0f * scale);
+    }
     if (icon && icon->width > 0 && icon->height > 0)
     {
         const float fit = std::min(iconWidth / icon->width, iconHeight / icon->height);
@@ -586,6 +620,7 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
     TurnButtonContent content;
     content.icon = attackSpellPreview(context);
+    content.iconGlow = content.icon.has_value();
     if (!content.icon)
     {
         content.icon = itemIcon(context, attackWeaponPreview(context));
