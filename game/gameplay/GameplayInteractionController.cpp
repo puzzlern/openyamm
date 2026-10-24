@@ -2063,6 +2063,17 @@ GameplayInteractionController::updateWorldInteractionFrame(
         runtime.clearContextActionState();
     }
 
+    // Lets the turn indicator show the bow or the melee weapon the next attack would use.
+    constexpr uint64_t MeleeRangeCheckIntervalNanoseconds = 250'000'000;
+    const uint64_t meleeRangeCheckTicks = SDL_GetTicksNS();
+    if (pWorldRuntime != nullptr && runtime.turnBasedCombatRuntime().active()
+        && meleeRangeCheckTicks - overlayInteractionState.turnMeleeRangeCheckTicks >= MeleeRangeCheckIntervalNanoseconds)
+    {
+        overlayInteractionState.turnMeleeRangeCheckTicks = meleeRangeCheckTicks;
+        overlayInteractionState.turnHostileInMeleeRange = GameplayActionController::fallbackHostileInMeleeRange(
+            *pWorldRuntime, pWorldRuntime->buildPartyAttackFrameInput(currentInteractionPickRequest));
+    }
+
     const bool hudWandRequested = overlayInteractionState.gameplayHudUseWandRequested;
     overlayInteractionState.gameplayHudUseWandRequested = false;
     const bool forceWandAttack = hudWandRequested || input.action(KeyboardAction::UseWand).pressed;

@@ -882,6 +882,30 @@ GameplayActionController::AttackActionDecision GameplayActionController::updateA
     return {};
 }
 
+bool GameplayActionController::fallbackHostileInMeleeRange(
+    IGameplayWorldRuntime &worldRuntime,
+    const GameplayPartyAttackFrameInput &partyAttackInput)
+{
+    if (!partyAttackInput.enabled)
+    {
+        return false;
+    }
+    const WorldPoint partyPosition = {
+        partyAttackInput.partyPosition.x, partyAttackInput.partyPosition.y, partyAttackInput.partyPosition.z};
+    for (const GameplayPartyAttackActorFacts &actor :
+        worldRuntime.collectPartyAttackFallbackActors(partyAttackInput.fallbackQuery))
+    {
+        const WorldPoint position = {actor.position.x, actor.position.y, actor.position.z};
+        if (isPartyAttackFallbackCandidate(actor)
+            && distanceBetween(position, partyPosition) - static_cast<float>(actor.radius)
+                <= CharacterMeleeAttackDistance)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 GameplayActionController::PartyAttackExecutionResult GameplayActionController::executePartyAttack(
     const PartyAttackConfig &config)
 {

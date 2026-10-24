@@ -715,6 +715,9 @@ struct GameplayOverlayInteractionState
     size_t scrollMenuScrollOffset = 0;
     uint32_t scrollsButtonPreviewItemId = 0;
     uint32_t potionsButtonPreviewItemId = 0;
+    // Turn indicator: whether an attack now would go to melee, refreshed a few times a second in turn-based combat.
+    bool turnHostileInMeleeRange = false;
+    uint64_t turnMeleeRangeCheckTicks = 0;
     std::optional<size_t> personalBuffPopupMember;
     bool overlayPersonalBuffClickLatch = false;
     std::optional<size_t> overlayPersonalBuffPressedIndex;

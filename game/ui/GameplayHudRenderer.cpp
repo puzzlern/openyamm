@@ -461,11 +461,6 @@ void renderTurnButton(
     drawRow(pDetailTemplate, rect.y + 21.333333f * scale, 9.6f, content.detail);
 }
 
-std::optional<GameplayHudTextureHandle> hudIcon(GameplayScreenRuntime &context, const char *pAsset)
-{
-    return context.gameplayUiRuntime().ensureHudTextureLoaded(pAsset);
-}
-
 std::optional<GameplayHudTextureHandle> itemIcon(GameplayScreenRuntime &context, const ItemDefinition *pItem)
 {
     if (pItem == nullptr || pItem->iconName.empty())
@@ -501,6 +496,40 @@ void renderFittedItemIcon(
         *icon, boxX + (boxWidth - iconWidth) * 0.5f, boxY + (boxHeight - iconHeight) * 0.5f, iconWidth, iconHeight);
 }
 
+// The weapon the active character's next attack would use, as the attack itself picks it: a wand or melee weapon
+// in hand, or the bow when no hostile is within melee reach. Nothing for bare fists.
+const ItemDefinition *attackWeaponPreview(GameplayScreenRuntime &context)
+{
+    const Party *pParty = context.partyReadOnly();
+    const ItemTable *pItemTable = context.itemTable();
+    if (pParty == nullptr || pItemTable == nullptr)
+    {
+        return nullptr;
+    }
+    const size_t memberIndex = pParty->activeMemberIndex();
+    const auto equipped = [&](EquipmentSlot slot) -> const ItemDefinition *
+    {
+        const uint32_t itemId = pParty->equippedItemId(memberIndex, slot);
+        return itemId != 0 ? pItemTable->get(itemId) : nullptr;
+    };
+    const ItemDefinition *pMainHand = equipped(EquipmentSlot::MainHand);
+    const ItemDefinition *pBow = equipped(EquipmentSlot::Bow);
+    if (pMainHand != nullptr && pMainHand->equipStat == "WeaponW")
+    {
+        return pMainHand;
+    }
+    if (pBow != nullptr && !context.interactionState().turnHostileInMeleeRange)
+    {
+        return pBow;
+    }
+    if (pMainHand != nullptr)
+    {
+        return pMainHand;
+    }
+    const ItemDefinition *pOffHand = equipped(EquipmentSlot::OffHand);
+    return pOffHand != nullptr && pOffHand->equipStat.rfind("Weapon", 0) == 0 ? pOffHand : nullptr;
+}
+
 // The turn indicator itself: the current stage, with the attack hotkey or the movement points left.
 void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
 {
@@ -517,7 +546,7 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     }
     const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
     TurnButtonContent content;
-    content.icon = hudIcon(context, "obsidian_action_attack");
+    content.icon = itemIcon(context, attackWeaponPreview(context));
     if (turn.stage() == TurnBasedCombatStage::Movement)
     {
         content.title = "Move";
@@ -550,7 +579,7 @@ void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
         context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::PassTurnButton;
     TurnButtonContent content;
-    content.icon = hudIcon(context, "obsidian_action_resume");
+    content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded("6lshield8"); // Lord Kilburn's Shield
     content.title = context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement ? "End Move" : "Pass";
     content.detail = hotkeyLabel(context, KeyboardAction::Pass);
     renderTurnButton(context, *buttonRect, content, hovered, pressed, false);
@@ -621,7 +650,10 @@ void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
     context.interactionState().scrollMenuScrollOffset =
         std::min(context.interactionState().scrollMenuScrollOffset, maxScroll);
     const float scale = panel.scale;
-    GameplayUiSkin::renderPanel(context, panel, true, 0.6f, 238);
+    // Same plain plate as the buttons, no frame.
+    GameplayUiSkin::renderTexture(context, "obsidian_hud_turn_normal", panel);
+    const std::optional<GameplayHudPaletteColor> hoverFill =
+        context.gameplayUiRuntime().ensureHudPaletteColor(0x30c7dce5u); // Translucent ivory.
 
     // Same font as the turn buttons (ObsidianTurnPhase).
     UiLayoutManager::LayoutElement label = *pFontTemplate;
@@ -647,7 +679,11 @@ void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
         const float pointerY = pInput != nullptr ? pInput->pointerY : -1.0f;
         const bool hovered = hasEntry && pointerX >= rowRect.x && pointerX < rowRect.x + rowRect.width
             && pointerY >= rowRect.y && pointerY < rowRect.y + rowRect.height;
-        GameplayUiSkin::renderPanel(context, rowRect, false, 0.12f, hovered ? 210 : 80);
+        if (hovered && hoverFill)
+        {
+            context.submitHudQuadBatch(
+                {gameplayHudPaletteQuad(*hoverFill, rowRect.x, rowRect.y, rowRect.width, rowRect.height)});
+        }
 
         if (hasEntry)
         {

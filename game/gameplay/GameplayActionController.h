@@ -159,5 +159,9 @@ public:
         GameplayScreenState::QuickSpellState &quickSpellState,
         const AttackActionConfig &config);
     static PartyAttackExecutionResult executePartyAttack(const PartyAttackConfig &config);
+    // Whether an untargeted attack would pick a melee target: the nearest fallback hostile is within melee reach.
+    static bool fallbackHostileInMeleeRange(
+        IGameplayWorldRuntime &worldRuntime,
+        const GameplayPartyAttackFrameInput &partyAttackInput);
 };
 } // namespace OpenYAMM::Game
