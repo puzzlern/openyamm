@@ -31,13 +31,15 @@ In turn-based mode the bottom-left corner shows a vertical column: **Attack**, *
 shows an icon, a name and its hotkey, read from your current key bindings, so rebinding a key updates the label.
 
 - **Attack** shows what your next attack will use:
-  - the character's **attack spell**, using its coloured art from the spellbook with a soft glow, while they have
-    the mana to cast it;
+  - the character's **attack spell**, using its coloured art from the spellbook on a parchment-coloured backing,
+    while they have the mana to cast it;
   - otherwise their **bow** when no enemy is within melee reach, or their **melee weapon** when one is. The button
     switches live as monsters close in;
   - no icon when fighting bare-handed.
-  During the movement phase it shows your remaining action points instead of a hotkey.
-- **Pass** / **End Move** (default **B**), with Lord Kilburn's Shield as its icon.
+  During the movement phase it shows your remaining action points instead of a hotkey. Clicking it attacks, the same
+  as the hotkey, against the nearest enemy. In the official game a click here left turn-based mode; the **Combat** key
+  (Enter) still does that.
+- **Pass** (default **B**) with Lord Kilburn's Shield, or **End Move** with MM6's leather boots during movement.
 - **Wand** shows the equipped wand and, once the wand is identified, its remaining charges (red at 0). It drops into
   Pass's slot when Pass isn't available, so the column never has a gap.
 

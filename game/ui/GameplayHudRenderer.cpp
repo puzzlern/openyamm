@@ -388,30 +388,41 @@ struct TurnButtonContent
     uint32_t badgeColorAbgr = 0;
     // Marks a button that opens a menu upwards.
     bool menuArrow = false;
-    // A soft gold halo behind the icon, to lift busy art (spellbook illustrations) off the plate.
+    // A parchment oval behind the icon, so spellbook illustrations sit on the page colour they were drawn for.
     bool iconGlow = false;
 };
 
-// A soft radial glow: nested translucent ellipses, each built from one-pixel-ish horizontal strips, so the overlaps
-// brighten towards the centre. The HUD has no blur or radial texture to draw this with.
-void renderSoftGlow(GameplayScreenRuntime &context, float centerX, float centerY, float radiusX, float radiusY)
+// A parchment-coloured oval like the spellbook's page: a solid core with a half-transparent outer ring as the fade.
+// Each ellipse is drawn as thin horizontal strips; the HUD has no blur or radial texture to draw this with.
+void renderParchmentGlow(GameplayScreenRuntime &context, float centerX, float centerY, float radiusX, float radiusY)
 {
-    const std::optional<GameplayHudPaletteColor> color =
-        context.gameplayUiRuntime().ensureHudPaletteColor(0x1e93c7e4u); // GameplayUiSkin::Gold, faint.
-    if (!color || radiusX <= 0.0f || radiusY <= 0.0f)
+    // Averaged from the spellbook page art (sbf000), RGB 236, 204, 146.
+    constexpr uint32_t ParchmentAbgr = 0x0092ccecu;
+    const struct
+    {
+        float fraction;
+        uint32_t alpha;
+    } layers[] = {{1.0f, 0x80u}, {0.85f, 0xffu}};
+    if (radiusX <= 0.0f || radiusY <= 0.0f)
     {
         return;
     }
     std::vector<GameplayHudBatchQuad> quads;
-    for (const float fraction : {1.0f, 0.85f, 0.7f, 0.55f, 0.4f, 0.25f})
+    for (const auto &layer : layers)
     {
-        const float layerRadiusY = radiusY * fraction;
+        const std::optional<GameplayHudPaletteColor> color =
+            context.gameplayUiRuntime().ensureHudPaletteColor((layer.alpha << 24) | ParchmentAbgr);
+        if (!color)
+        {
+            continue;
+        }
+        const float layerRadiusY = radiusY * layer.fraction;
         const int rows = std::max(4, static_cast<int>(std::ceil(2.0f * layerRadiusY / 1.5f)));
         const float rowHeight = 2.0f * layerRadiusY / static_cast<float>(rows);
         for (int row = 0; row < rows; ++row)
         {
             const float t = ((static_cast<float>(row) + 0.5f) * rowHeight - layerRadiusY) / layerRadiusY;
-            const float halfWidth = radiusX * fraction * std::sqrt(std::max(0.0f, 1.0f - t * t));
+            const float halfWidth = radiusX * layer.fraction * std::sqrt(std::max(0.0f, 1.0f - t * t));
             quads.push_back(gameplayHudPaletteQuad(*color, centerX - halfWidth,
                 centerY - layerRadiusY + static_cast<float>(row) * rowHeight, 2.0f * halfWidth, rowHeight));
         }
@@ -442,7 +453,7 @@ void renderTurnButton(
     if (icon && content.iconGlow)
     {
         // Kept inside the plate: the icon box sits 5 units in from the left edge.
-        renderSoftGlow(context, iconX + iconWidth * 0.5f, iconY + iconHeight * 0.5f, 17.0f * scale, 15.0f * scale);
+        renderParchmentGlow(context, iconX + iconWidth * 0.5f, iconY + iconHeight * 0.5f, 17.0f * scale, 15.0f * scale);
     }
     if (icon && icon->width > 0 && icon->height > 0)
     {
@@ -639,7 +650,9 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     {
         content.title = "Waiting";
     }
-    renderTurnButton(context, *rect, content, pointerOverRect(context, *rect), false, false);
+    const bool pressed = context.interactionState().gameplayHudClickLatch
+        && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::AttackButton;
+    renderTurnButton(context, *rect, content, pointerOverRect(context, *rect), pressed, false);
 }
 
 void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
@@ -657,8 +670,10 @@ void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
         context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::PassTurnButton;
     TurnButtonContent content;
-    content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded("6lshield8"); // Lord Kilburn's Shield
-    content.title = context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement ? "End Move" : "Pass";
+    const bool movement = context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement;
+    // MM6's Old Leather Boots to end movement, Lord Kilburn's Shield to pass.
+    content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded(movement ? "6boots1" : "6lshield8");
+    content.title = movement ? "End Move" : "Pass";
     content.detail = hotkeyLabel(context, KeyboardAction::Pass);
     renderTurnButton(context, *buttonRect, content, hovered, pressed, false);
 }

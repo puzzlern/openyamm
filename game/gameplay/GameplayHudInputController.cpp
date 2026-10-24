@@ -464,10 +464,12 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
             {
                 return {GameplayHudPointerTargetType::UseWandButton};
             }
+            // The turn indicator is the Attack button (it shows the attack's weapon or spell and hotkey), so a click
+            // attacks rather than leaving turn-based mode; the Combat key still toggles the mode.
             if (context.turnBasedCombatRuntime().active()
-                && pointerInsideHudElement(context, config, "ObsidianTurnDock", pointerX, pointerY))
+                && pointerInsideHudElement(context, config, "ObsidianTurnPlate", pointerX, pointerY))
             {
-                return {GameplayHudPointerTargetType::TurnBasedToggleButton};
+                return {GameplayHudPointerTargetType::AttackButton};
             }
             const GameplayContextActionState &contextActionState = context.contextActionStateReadOnly();
             const bool hasDropHeldItemAction =
