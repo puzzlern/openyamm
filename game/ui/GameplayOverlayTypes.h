@@ -713,6 +713,8 @@ struct GameplayOverlayInteractionState
     bool scrollMenuOpen = false;
     bool potionsMenuOpen = false;
     size_t scrollMenuScrollOffset = 0;
+    uint32_t scrollsButtonPreviewItemId = 0;
+    uint32_t potionsButtonPreviewItemId = 0;
     std::optional<size_t> personalBuffPopupMember;
     bool overlayPersonalBuffClickLatch = false;
     std::optional<size_t> overlayPersonalBuffPressedIndex;

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -343,13 +344,89 @@ void renderContextAction(GameplayScreenRuntime &context, int width, int height)
     }
 }
 
-void renderSimpleTurnButton(
+bool pointerOverRect(GameplayScreenRuntime &context, const GameplayResolvedHudLayoutElement &rect)
+{
+    const GameplayInputFrame *pInput = context.currentGameplayInputFrame();
+    return pInput != nullptr
+        && pInput->pointerX >= rect.x && pInput->pointerX < rect.x + rect.width
+        && pInput->pointerY >= rect.y && pInput->pointerY < rect.y + rect.height;
+}
+
+uint32_t turnButtonTextColor(uint32_t baseColor, bool hovered, bool selected)
+{
+    return hovered ? 0xffd4efffu : selected ? GameplayUiSkin::Gold : baseColor;
+}
+
+// Pass, wand, scroll and potion buttons share the turn indicator's plate, fonts and colours (ObsidianTurnPlate).
+// The plate art has no hover or pressed variants, so state shows in the content: brighter or gold text, and a
+// one-pixel press offset.
+void renderTurnPlateButton(GameplayScreenRuntime &context, const GameplayResolvedHudLayoutElement &rect)
+{
+    GameplayUiSkin::renderTexture(context, "obsidian_hud_turn_normal", rect);
+}
+
+// Same two rows as the turn indicator: ObsidianTurnPhase above ObsidianTurnDetail.
+void renderTurnPlateLabels(
     GameplayScreenRuntime &context,
     const GameplayResolvedHudLayoutElement &rect,
     bool hovered,
     bool pressed,
     bool selected,
-    const std::vector<std::string> &lines);
+    const std::string &phase,
+    const std::string &detail)
+{
+    const float scale = rect.scale;
+    const float pressOffset = pressed ? scale : 0.0f;
+    const float labelX = rect.x + (rect.width - 60.8f * scale) * 0.5f;
+    const auto drawRow = [&](const char *pLayoutId, float offsetY, float rowHeight, const std::string &text)
+    {
+        const UiLayoutManager::LayoutElement *pTemplate = context.findHudLayoutElement(pLayoutId);
+        if (pTemplate == nullptr || text.empty())
+        {
+            return;
+        }
+        UiLayoutManager::LayoutElement label = *pTemplate;
+        label.textColorAbgr = turnButtonTextColor(pTemplate->textColorAbgr, hovered, selected);
+        context.renderLayoutLabel(
+            label,
+            {labelX, rect.y + offsetY * scale + pressOffset, 60.8f * scale, rowHeight * scale, scale},
+            text,
+            false);
+    };
+    if (detail.empty())
+    {
+        drawRow("ObsidianTurnPhase", 13.333333f, 12.8f, phase);
+        return;
+    }
+    drawRow("ObsidianTurnPhase", 7.466667f, 12.8f, phase);
+    drawRow("ObsidianTurnDetail", 21.333333f, 9.6f, detail);
+}
+
+// Fits an item icon inside a box, keeping its aspect ratio, centred.
+void renderFittedItemIcon(
+    GameplayScreenRuntime &context,
+    const std::string &iconName,
+    float boxX,
+    float boxY,
+    float boxWidth,
+    float boxHeight)
+{
+    if (iconName.empty())
+    {
+        return;
+    }
+    const std::optional<GameplayHudTextureHandle> icon =
+        context.gameplayUiRuntime().ensureItemIconTextureLoaded(iconName);
+    if (!icon || icon->width <= 0 || icon->height <= 0)
+    {
+        return;
+    }
+    const float fit = std::min(boxWidth / icon->width, boxHeight / icon->height);
+    const float iconWidth = icon->width * fit;
+    const float iconHeight = icon->height * fit;
+    context.submitHudTexturedQuad(
+        *icon, boxX + (boxWidth - iconWidth) * 0.5f, boxY + (boxHeight - iconHeight) * 0.5f, iconWidth, iconHeight);
+}
 
 void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
 {
@@ -361,61 +438,70 @@ void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
         return;
     }
 
+    const bool hovered = pointerOverRect(context, *buttonRect);
     const bool pressed =
         context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::PassTurnButton;
-    renderSimpleTurnButton(
-        context,
-        *buttonRect,
-        false,
-        pressed,
-        false,
-        context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement
-            ? std::vector<std::string>{"End", "Move"}
-            : std::vector<std::string>{"Pass"});
+    const bool movement = context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement;
+    renderTurnPlateButton(context, *buttonRect);
+    renderTurnPlateLabels(
+        context, *buttonRect, hovered, pressed, false, movement ? "End" : "Pass", movement ? "Movement" : "Turn");
 }
 
 void renderUseWandButton(GameplayScreenRuntime &context, int width, int height)
 {
     const auto rect = context.resolveUseWandButton(width, height);
-    if (!rect) return;
+    const Party *pParty = context.partyReadOnly();
+    if (!rect || pParty == nullptr || context.itemTable() == nullptr)
+    {
+        return;
+    }
+    const bool hovered = pointerOverRect(context, *rect);
     const bool pressed = context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::UseWandButton;
-    renderSimpleTurnButton(context, *rect, false, pressed, false, {"Use", "Wand"});
-}
+    renderTurnPlateButton(context, *rect);
 
-void renderSimpleTurnButton(
-    GameplayScreenRuntime &context,
-    const GameplayResolvedHudLayoutElement &rect,
-    bool hovered,
-    bool pressed,
-    bool selected,
-    const std::vector<std::string> &lines)
-{
-    const float plateSize = std::min(rect.width, rect.height);
-    const GameplayResolvedHudLayoutElement plate = {
-        rect.x + (rect.width - plateSize) * 0.5f,
-        rect.y + (rect.height - plateSize) * 0.5f,
-        plateSize,
-        plateSize,
-        rect.scale};
-    GameplayUiSkin::renderTexture(
-        context,
-        pressed ? "obsidian_touch_pressed" : selected ? "obsidian_touch_active"
-            : hovered ? "obsidian_touch_hover" : "obsidian_touch_normal",
-        plate);
+    // Same slot choice as the wand attack: the dedicated wand slot first, else a wand held in the main hand.
+    const size_t memberIndex = pParty->activeMemberIndex();
+    const EquipmentSlot slot =
+        pParty->equippedItemId(memberIndex, EquipmentSlot::Wand) != 0 ? EquipmentSlot::Wand : EquipmentSlot::MainHand;
+    const ItemDefinition *pWand = context.itemTable()->get(pParty->equippedItemId(memberIndex, slot));
+    const EquippedItemRuntimeState *pRuntime = pParty->equippedItemRuntime(memberIndex, slot);
+    const float scale = rect->scale;
+    const float pressOffset = pressed ? scale : 0.0f;
+    const bool showCharges = pRuntime != nullptr && pRuntime->identified;
 
-    UiLayoutManager::LayoutElement labelLayout = {};
-    labelLayout.fontName = "Lucida";
-    labelLayout.textColorAbgr = 0xffe5dcc7u;
-    labelLayout.textAlignX = UiLayoutManager::TextAlignX::Center;
-    labelLayout.textAlignY = UiLayoutManager::TextAlignY::Middle;
-    labelLayout.textScale = 0.7f;
-    if (pressed)
+    if (pWand != nullptr)
     {
-        labelLayout.textPadY = rect.scale;
+        const float rightReserve = showCharges ? 22.0f * scale : 0.0f;
+        renderFittedItemIcon(
+            context,
+            pWand->iconName,
+            rect->x + 8.0f * scale,
+            rect->y + 5.0f * scale + pressOffset,
+            rect->width - 16.0f * scale - rightReserve,
+            rect->height - 10.0f * scale);
     }
-    renderCenteredContextActionLabelLines(context, labelLayout, rect, lines);
+
+    if (showCharges)
+    {
+        const UiLayoutManager::LayoutElement *pTemplate = context.findHudLayoutElement("ObsidianTurnDetail");
+        if (pTemplate != nullptr)
+        {
+            UiLayoutManager::LayoutElement label = *pTemplate;
+            label.textAlignX = UiLayoutManager::TextAlignX::Right;
+            label.textScale = pTemplate->textScale * 1.25f;
+            label.textColorAbgr = pRuntime->currentCharges == 0
+                ? GameplayUiSkin::Penalty
+                : turnButtonTextColor(pTemplate->textColorAbgr, hovered, false);
+            context.renderLayoutLabel(
+                label,
+                {rect->x + rect->width - 34.0f * scale, rect->y + rect->height - 20.0f * scale + pressOffset,
+                    26.0f * scale, 12.0f * scale, scale},
+                std::to_string(pRuntime->currentCharges),
+                false);
+        }
+    }
 }
 
 void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
@@ -528,6 +614,25 @@ void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
     }
 }
 
+// The item the button shows: kept while the party still carries it, otherwise a new random pick.
+uint32_t pickItemMenuPreview(const std::vector<GameplayScrollMenuEntry> &entries, uint32_t current)
+{
+    if (entries.empty())
+    {
+        return 0;
+    }
+    for (const GameplayScrollMenuEntry &entry : entries)
+    {
+        if (entry.objectDescriptionId == current)
+        {
+            return current;
+        }
+    }
+    static std::mt19937 generator(std::random_device{}());
+    std::uniform_int_distribution<size_t> pick(0, entries.size() - 1);
+    return entries[pick(generator)].objectDescriptionId;
+}
+
 void renderItemMenuButton(
     GameplayScreenRuntime &context,
     int width,
@@ -535,7 +640,10 @@ void renderItemMenuButton(
     const char *layoutId,
     const char *labelText)
 {
-    if (context.currentHudScreenState() != GameplayHudScreenState::Gameplay)
+    const Party *pParty = context.partyReadOnly();
+    if (context.currentHudScreenState() != GameplayHudScreenState::Gameplay
+        || pParty == nullptr
+        || context.itemTable() == nullptr)
     {
         return;
     }
@@ -548,14 +656,48 @@ void renderItemMenuButton(
     }
 
     const GameplayInputFrame *pInput = context.currentGameplayInputFrame();
-    const bool hovered = pInput != nullptr
-        && pInput->pointerX >= rect->x && pInput->pointerX < rect->x + rect->width
-        && pInput->pointerY >= rect->y && pInput->pointerY < rect->y + rect->height;
+    const bool hovered = pointerOverRect(context, *rect);
     const bool pressed = hovered && pInput->leftMouseButton.held;
-    const bool selected = layoutId == std::string("OutdoorButtonScrolls")
-        ? context.interactionState().scrollMenuOpen
-        : context.interactionState().potionsMenuOpen;
-    renderSimpleTurnButton(context, *rect, hovered, pressed, selected, {labelText});
+    const bool potions = layoutId != std::string("OutdoorButtonScrolls");
+    const bool selected = potions
+        ? context.interactionState().potionsMenuOpen
+        : context.interactionState().scrollMenuOpen;
+    renderTurnPlateButton(context, *rect);
+
+    const std::vector<GameplayScrollMenuEntry> entries = potions
+        ? collectGameplayPotionMenuEntries(
+            *pParty, *context.itemTable(), context.mergedPotionSettingTable(), context.mergedReagentSettingTable())
+        : collectGameplayScrollMenuEntries(*pParty, *context.itemTable());
+    uint32_t &previewItemId = potions
+        ? context.interactionState().potionsButtonPreviewItemId
+        : context.interactionState().scrollsButtonPreviewItemId;
+    previewItemId = pickItemMenuPreview(entries, previewItemId);
+    const ItemDefinition *pPreview = previewItemId != 0 ? context.itemTable()->get(previewItemId) : nullptr;
+
+    const float scale = rect->scale;
+    const float pressOffset = pressed ? scale : 0.0f;
+    if (pPreview != nullptr)
+    {
+        renderFittedItemIcon(
+            context,
+            pPreview->iconName,
+            rect->x + 14.0f * scale,
+            rect->y + 5.0f * scale + pressOffset,
+            rect->width - 28.0f * scale,
+            rect->height - 10.0f * scale);
+    }
+    else
+    {
+        renderTurnPlateLabels(context, *rect, hovered, pressed, selected, labelText, "");
+    }
+
+    // The menu opens upwards from the button.
+    const float arrowSize = 12.0f * scale;
+    GameplayUiSkin::renderTexture(
+        context,
+        "obsidian_action_up",
+        {rect->x + rect->width - arrowSize - 6.0f * scale, rect->y + 5.0f * scale + pressOffset,
+            arrowSize, arrowSize, scale});
 }
 
 } // namespace
