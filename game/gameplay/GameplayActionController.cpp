@@ -757,6 +757,32 @@ bool lacksManaForAttackSpell(
         PartySpellSystem::manaCost(attacker, *config.pSpellTable, uint32_t(pSpellEntry->id));
     return manaCost && !config.pParty->canSpendSpellPoints(attackerMemberIndex, int(*manaCost));
 }
+
+// The attack spell would find nothing to cast at (no actor for Life Drain, nobody hurt for a heal): the attack then
+// swings or shoots instead of failing with "No valid target".
+bool lacksTargetForAttackSpell(
+    const GameplayActionController::PartyAttackConfig &config,
+    size_t attackerMemberIndex,
+    const Character &attacker)
+{
+    if (config.pRuntime == nullptr || config.pSpellService == nullptr || config.pSpellTable == nullptr)
+    {
+        return false;
+    }
+
+    const SpellEntry *pSpellEntry = config.pSpellTable->findByName(attacker.attackSpellName);
+
+    if (pSpellEntry == nullptr)
+    {
+        return false;
+    }
+
+    PartySpellCastRequest request = {};
+    request.casterMemberIndex = attackerMemberIndex;
+    request.spellId = uint32_t(pSpellEntry->id);
+    return !config.pSpellService->tryPrepareQuickCastRequest(
+        *config.pRuntime, request, pSpellEntry->name, config.targetQueries);
+}
 } // namespace
 
 void GameplayActionController::updateCooldowns(GameplayScreenState &screenState, float deltaSeconds)
@@ -987,7 +1013,8 @@ GameplayActionController::PartyAttackExecutionResult GameplayActionController::e
 
     if (!config.forceWandAttack
         && !pAttacker->attackSpellName.empty()
-        && !lacksManaForAttackSpell(config, actingMemberIndex, *pAttacker))
+        && !lacksManaForAttackSpell(config, actingMemberIndex, *pAttacker)
+        && !lacksTargetForAttackSpell(config, actingMemberIndex, *pAttacker))
     {
         AttackCastResult attackCastResult = {};
 

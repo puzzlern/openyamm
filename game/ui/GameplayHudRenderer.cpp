@@ -609,7 +609,8 @@ bool applyAttackSpellPreview(GameplayScreenRuntime &context, int width, int heig
     const Party *pParty = context.partyReadOnly();
     const SpellTable *pSpellTable = context.spellTable();
     const Character *pCharacter = pParty != nullptr ? pParty->activeMember() : nullptr;
-    if (pCharacter == nullptr || pSpellTable == nullptr || pCharacter->attackSpellName.empty())
+    if (pCharacter == nullptr || pSpellTable == nullptr || pCharacter->attackSpellName.empty()
+        || !context.interactionState().turnAttackSpellHasTarget)
     {
         return false;
     }
@@ -691,9 +692,16 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     }
     const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
     TurnButtonContent content;
-    if (!applyAttackSpellPreview(context, width, height, content))
+    if (turn.stage() == TurnBasedCombatStage::Movement)
     {
-        content.icon = itemIcon(context, attackWeaponPreview(context));
+        content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded("6boots1"); // MM6 Old Leather Boots
+    }
+    else if (!applyAttackSpellPreview(context, width, height, content))
+    {
+        const ItemDefinition *pWeapon = attackWeaponPreview(context);
+        // Bare hands show plain Leather Gloves.
+        content.icon = pWeapon != nullptr ? itemIcon(context, pWeapon)
+                                          : context.gameplayUiRuntime().ensureItemIconTextureLoaded("item127");
     }
     if (turn.stage() == TurnBasedCombatStage::Movement)
     {
@@ -729,10 +737,9 @@ void renderPassTurnButton(GameplayScreenRuntime &context, int width, int height)
         context.interactionState().gameplayHudClickLatch
         && context.interactionState().gameplayHudPressedTarget.type == GameplayHudPointerTargetType::PassTurnButton;
     TurnButtonContent content;
-    const bool movement = context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement;
-    // MM6's Old Leather Boots to end movement, Lord Kilburn's Shield to pass.
-    content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded(movement ? "6boots1" : "6lshield8");
-    content.title = movement ? "End Move" : "Pass";
+    content.icon = context.gameplayUiRuntime().ensureItemIconTextureLoaded("6lshield8"); // Lord Kilburn's Shield
+    content.title =
+        context.turnBasedCombatRuntime().stage() == TurnBasedCombatStage::Movement ? "End Move" : "Pass";
     content.detail = hotkeyLabel(context, KeyboardAction::Pass);
     renderTurnButton(context, *buttonRect, content, hovered, pressed, false);
 }

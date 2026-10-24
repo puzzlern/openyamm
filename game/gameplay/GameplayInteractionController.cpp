@@ -2063,7 +2063,8 @@ GameplayInteractionController::updateWorldInteractionFrame(
         runtime.clearContextActionState();
     }
 
-    // Lets the turn indicator show the bow or the melee weapon the next attack would use.
+    // Lets the turn indicator show what the next attack would use: the attack spell while it has a target, else the
+    // bow or the melee weapon.
     constexpr uint64_t MeleeRangeCheckIntervalNanoseconds = 250'000'000;
     const uint64_t meleeRangeCheckTicks = SDL_GetTicksNS();
     if (pWorldRuntime != nullptr && runtime.turnBasedCombatRuntime().active()
@@ -2072,6 +2073,18 @@ GameplayInteractionController::updateWorldInteractionFrame(
         overlayInteractionState.turnMeleeRangeCheckTicks = meleeRangeCheckTicks;
         overlayInteractionState.turnHostileInMeleeRange = GameplayActionController::fallbackHostileInMeleeRange(
             *pWorldRuntime, pWorldRuntime->buildPartyAttackFrameInput(currentInteractionPickRequest));
+
+        const Party *pParty = runtime.partyReadOnly();
+        const Character *pAttacker = pParty != nullptr ? pParty->activeMember() : nullptr;
+        const SpellEntry *pAttackSpell = pAttacker != nullptr && runtime.spellTable() != nullptr
+                && !pAttacker->attackSpellName.empty()
+            ? runtime.spellTable()->findByName(pAttacker->attackSpellName)
+            : nullptr;
+        PartySpellCastRequest attackSpellRequest = {};
+        attackSpellRequest.casterMemberIndex = pParty != nullptr ? pParty->activeMemberIndex() : 0;
+        attackSpellRequest.spellId = pAttackSpell != nullptr ? uint32_t(pAttackSpell->id) : 0;
+        overlayInteractionState.turnAttackSpellHasTarget = pAttackSpell == nullptr
+            || spellService.tryPrepareQuickCastRequest(runtime, attackSpellRequest, pAttackSpell->name, targetQueries);
     }
 
     const bool hudWandRequested = overlayInteractionState.gameplayHudUseWandRequested;

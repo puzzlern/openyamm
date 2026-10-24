@@ -717,6 +717,8 @@ struct GameplayOverlayInteractionState
     uint32_t potionsButtonPreviewItemId = 0;
     // Turn indicator: whether an attack now would go to melee, refreshed a few times a second in turn-based combat.
     bool turnHostileInMeleeRange = false;
+    // Whether the active character's attack spell would find a target; without one the attack swings instead.
+    bool turnAttackSpellHasTarget = true;
     uint64_t turnMeleeRangeCheckTicks = 0;
     std::optional<size_t> personalBuffPopupMember;
     bool overlayPersonalBuffClickLatch = false;
