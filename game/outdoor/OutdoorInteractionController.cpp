@@ -587,11 +587,10 @@ std::optional<size_t> OutdoorInteractionController::resolveSpellActionHoveredAct
 
     const OutdoorWorldRuntime::MapActorState *pActor = view.m_pOutdoorWorldRuntime->mapActorState(*actorIndex);
 
-    if (pActor == nullptr
-        || pActor->isDead
-        || pActor->isInvisible
-        || !pActor->hostileToParty
-        || !pActor->hasDetectedParty)
+    // The actor the player points at is the target whether or not it has noticed the party yet, as indoors. Only the
+    // closest-hostile fallback needs an aware hostile; requiring one here left actor-effect spells such as Life Drain
+    // with "No valid target" against a monster that had not spotted the party.
+    if (pActor == nullptr || pActor->isDead || pActor->isInvisible)
     {
         return std::nullopt;
     }
