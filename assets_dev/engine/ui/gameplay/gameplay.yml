@@ -1010,8 +1010,8 @@ elements:
 - id: OutdoorButtonScrolls
   anchor_space: screen
   anchor: bottom_right
-  offset_x: -91.733333
-  offset_y: -12.266667
+  offset_x: -8
+  offset_y: -53.866667
   width: 75.733333
   height: 39.466667
   scale:
@@ -1019,7 +1019,7 @@ elements:
     max: 8.0
   interactive: true
   z_index: 240
-  notes: Scroll inventory control opposite the turn dock.
+  notes: Scroll inventory control, stacked above the potions button opposite the turn dock.
 - id: OutdoorButtonPotions
   anchor_space: screen
   anchor: bottom_right
@@ -1607,7 +1607,7 @@ elements:
   anchor: bottom_left
   offset_x: 14.933333
   offset_y: -15.466667
-  width: 232.0
+  width: 69.333333
   height: 33.066667
   children:
   - id: ObsidianTurnPlate
@@ -1646,20 +1646,20 @@ elements:
       scale: 0.55
   - id: ObsidianTurnPassButton
     anchor: top_left
-    offset_x: 74.666667
-    offset_y: -3.2
+    offset_x: -3.2
+    offset_y: -44.8
     width: 75.733333
     height: 39.466667
     interactive: true
-    notes: Pass / End Movement, attached right of the turn plate while the party can pass.
+    notes: Pass / End Movement, stacked above the turn plate while the party can pass.
   - id: ObsidianTurnUseWandButton
     anchor: top_left
-    offset_x: 152.533333
-    offset_y: -3.2
+    offset_x: -3.2
+    offset_y: -86.4
     width: 75.733333
     height: 39.466667
     interactive: true
-    notes: Use the equipped wand.
+    notes: Use the equipped wand, stacked above Pass (takes Pass's slot while Pass is hidden).
   interactive: true
   visible: false
   anchor_space: screen

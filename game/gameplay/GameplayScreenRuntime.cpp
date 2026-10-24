@@ -22,6 +22,7 @@
 #include "game/tables/MergedBaseTables.h"
 #include "game/ui/EnemyHealthBarRenderer.h"
 #include "game/ui/GameplayJournalMapUi.h"
+#include "game/ui/GameplayScrollMenu.h"
 #include "game/ui/SpellbookUiLayout.h"
 #include "game/ui/GameplayUiSkin.h"
 
@@ -749,7 +750,32 @@ std::optional<GameplayScreenRuntime::ResolvedHudLayoutElement> GameplayScreenRun
     {
         return std::nullopt;
     }
-    return resolveHudLayoutElement("ObsidianTurnUseWandButton", width, height, 0, 0);
+    // Stacked above Pass; drops into Pass's slot while Pass is hidden so the column has no gap.
+    return resolveHudLayoutElement(
+        resolvePassTurnButton(width, height) ? "ObsidianTurnUseWandButton" : "ObsidianTurnPassButton",
+        width, height, 0, 0);
+}
+
+std::optional<GameplayScreenRuntime::ResolvedHudLayoutElement> GameplayScreenRuntime::resolveItemMenuPanel(
+    int width,
+    int height,
+    bool potions,
+    size_t entryCount) const
+{
+    // The scrolls button tops the item column, so either list opens above it without covering a button.
+    const std::optional<ResolvedHudLayoutElement> top =
+        resolveHudLayoutElement("OutdoorButtonScrolls", width, height, 0, 0);
+    if (!top)
+    {
+        return std::nullopt;
+    }
+    const GameplayItemMenuLayout layout = gameplayItemMenuLayout(potions);
+    const size_t visibleRows = std::max<size_t>(1, std::min(layout.maxVisibleRows, entryCount));
+    const float panelWidth = layout.width * top->scale;
+    const float panelHeight = layout.rowHeight * static_cast<float>(visibleRows) * top->scale;
+    return ResolvedHudLayoutElement{
+        top->x + top->width - panelWidth, top->y - 3.0f * top->scale - panelHeight, panelWidth, panelHeight,
+        top->scale};
 }
 
 const char *GameplayScreenRuntime::mobileInspectLayoutId() const

@@ -104,6 +104,9 @@ public:
     // Android turn-based Pass strip: the context action slot, or directly above a visible context action.
     std::optional<ResolvedHudLayoutElement> resolvePassTurnButton(int width, int height) const;
     std::optional<ResolvedHudLayoutElement> resolveUseWandButton(int width, int height) const;
+    // The open scroll or potion list: right-aligned with the item buttons, opening upwards above both.
+    std::optional<ResolvedHudLayoutElement> resolveItemMenuPanel(
+        int width, int height, bool potions, size_t entryCount) const;
     float partyX() const;
     float partyY() const;
     float partyFootZ() const;

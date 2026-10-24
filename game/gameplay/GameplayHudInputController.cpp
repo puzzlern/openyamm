@@ -369,23 +369,15 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
         && context.currentGameplayInputFrame() != nullptr
         && context.partyReadOnly() != nullptr && context.itemTable() != nullptr)
     {
-        const size_t maxVisibleRows = context.interactionState().potionsMenuOpen ? 4 : 8;
-        const float rowHeight = context.interactionState().potionsMenuOpen ? 64.0f : 30.0f;
-        const float menuWidth = context.interactionState().potionsMenuOpen ? 270.0f : 220.0f;
+        const bool potionsMenu = context.interactionState().potionsMenuOpen;
+        const size_t maxVisibleRows = gameplayItemMenuLayout(potionsMenu).maxVisibleRows;
         const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
         const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
         const size_t maxScroll = entries.size() > visibleRows ? entries.size() - visibleRows : 0;
-        const char *menuButtonId = context.interactionState().potionsMenuOpen
-            ? "OutdoorButtonPotions" : "OutdoorButtonScrolls";
-        const std::optional<GameplayResolvedHudLayoutElement> button =
-            context.resolveHudLayoutElement(menuButtonId, config.screenWidth, config.screenHeight, 0, 0);
-        const float menuHeight = rowHeight * static_cast<float>(visibleRows) * (button ? button->scale : 1.0f);
-        const float menuX = button ? button->x + button->width - menuWidth * button->scale : 0.0f;
-        const bool pointerOverMenu = button
-            && config.pointerX >= menuX
-            && config.pointerX < menuX + menuWidth * button->scale
-            && config.pointerY >= button->y - menuHeight
-            && config.pointerY < button->y;
+        const std::optional<GameplayResolvedHudLayoutElement> panel = context.resolveItemMenuPanel(
+            config.screenWidth, config.screenHeight, potionsMenu, entries.size());
+        const bool pointerOverMenu = panel
+            && context.isPointerInsideResolvedElement(*panel, config.pointerX, config.pointerY);
         const float wheel = context.currentGameplayInputFrame()->mouseWheelDelta;
         if (pointerOverMenu && wheel != 0.0f)
         {
@@ -413,27 +405,21 @@ void GameplayHudInputController::handleGameplayHudButtonInput(
             if (context.interactionState().scrollMenuOpen || context.interactionState().potionsMenuOpen)
             {
                 const bool potionsMenu = context.interactionState().potionsMenuOpen;
-                const size_t maxVisibleRows = potionsMenu ? 4 : 8;
-                const float rowHeight = potionsMenu ? 64.0f : 30.0f;
-                const float menuWidth = potionsMenu ? 270.0f : 220.0f;
+                const float rowHeight = gameplayItemMenuLayout(potionsMenu).rowHeight;
                 const char *menuButtonId = context.interactionState().potionsMenuOpen
                     ? "OutdoorButtonPotions" : "OutdoorButtonScrolls";
                 const std::optional<GameplayResolvedHudLayoutElement> button =
                     context.resolveHudLayoutElement(menuButtonId, config.screenWidth, config.screenHeight, 0, 0);
-                if (button)
+                const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
+                const std::optional<GameplayResolvedHudLayoutElement> panel = context.resolveItemMenuPanel(
+                    config.screenWidth, config.screenHeight, potionsMenu, entries.size());
+                if (button && panel)
                 {
-                    const std::vector<GameplayScrollMenuEntry> entries = collectOpenMenuEntries();
-                    const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
-                    const GameplayResolvedHudLayoutElement panel = {
-                        button->x + button->width - menuWidth * button->scale,
-                        button->y - rowHeight * static_cast<float>(visibleRows) * button->scale,
-                        menuWidth * button->scale,
-                        rowHeight * static_cast<float>(visibleRows) * button->scale, button->scale};
-                    if (pointerX >= panel.x && pointerX < panel.x + panel.width
-                        && pointerY >= panel.y && pointerY < panel.y + panel.height)
+                    if (pointerX >= panel->x && pointerX < panel->x + panel->width
+                        && pointerY >= panel->y && pointerY < panel->y + panel->height)
                     {
                         const size_t row = static_cast<size_t>(
-                            (pointerY - panel.y) / (rowHeight * button->scale));
+                            (pointerY - panel->y) / (rowHeight * panel->scale));
                         const size_t entryIndex = context.interactionState().scrollMenuScrollOffset + row;
                         return entryIndex < entries.size()
                             ? GameplayHudPointerTarget{GameplayHudPointerTargetType::ScrollMenuItem, entryIndex}

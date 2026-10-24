@@ -514,42 +514,42 @@ void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
     }
 
     const Party *pParty = context.partyReadOnly();
-    const bool potionsMenu = context.interactionState().potionsMenuOpen;
-    const std::optional<GameplayResolvedHudLayoutElement> button = context.resolveHudLayoutElement(
-        potionsMenu ? "OutdoorButtonPotions" : "OutdoorButtonScrolls", width, height, 0, 0);
-    if (pParty == nullptr || !button)
+    const UiLayoutManager::LayoutElement *pFontTemplate = context.findHudLayoutElement("ObsidianTurnPhase");
+    if (pParty == nullptr || pFontTemplate == nullptr)
     {
         return;
     }
 
-    const size_t maxVisibleRows = potionsMenu ? 4 : 8;
-    const float rowHeight = potionsMenu ? 64.0f : 30.0f;
-    const float menuWidth = potionsMenu ? 270.0f : 220.0f;
+    const bool potionsMenu = context.interactionState().potionsMenuOpen;
+    const GameplayItemMenuLayout layout = gameplayItemMenuLayout(potionsMenu);
     const std::vector<GameplayScrollMenuEntry> entries = potionsMenu
         ? collectGameplayPotionMenuEntries(
             *pParty, *context.itemTable(), context.mergedPotionSettingTable(), context.mergedReagentSettingTable())
         : collectGameplayScrollMenuEntries(*pParty, *context.itemTable());
-    const size_t visibleRows = std::max<size_t>(1, std::min(maxVisibleRows, entries.size()));
+    const std::optional<GameplayResolvedHudLayoutElement> panelRect =
+        context.resolveItemMenuPanel(width, height, potionsMenu, entries.size());
+    if (!panelRect)
+    {
+        return;
+    }
+    const GameplayResolvedHudLayoutElement &panel = *panelRect;
+    const float rowHeight = layout.rowHeight;
+    const size_t visibleRows = std::max<size_t>(1, std::min(layout.maxVisibleRows, entries.size()));
     const size_t maxScroll = entries.size() > visibleRows ? entries.size() - visibleRows : 0;
     context.interactionState().scrollMenuScrollOffset =
         std::min(context.interactionState().scrollMenuScrollOffset, maxScroll);
-    const float scale = button->scale;
-    const GameplayResolvedHudLayoutElement panel = {
-        button->x + button->width - menuWidth * scale,
-        button->y - rowHeight * static_cast<float>(visibleRows) * scale,
-        menuWidth * scale,
-        rowHeight * static_cast<float>(visibleRows) * scale,
-        scale};
+    const float scale = panel.scale;
     GameplayUiSkin::renderPanel(context, panel, true, 0.6f, 238);
 
-    UiLayoutManager::LayoutElement label = {};
-    label.fontName = "Fondamento";
+    // Same font as the turn buttons (ObsidianTurnPhase).
+    UiLayoutManager::LayoutElement label = *pFontTemplate;
     label.textColorAbgr = GameplayUiSkin::Ivory;
     label.textAlignX = UiLayoutManager::TextAlignX::Left;
     label.textAlignY = UiLayoutManager::TextAlignY::Middle;
-    const float baseTextScale = potionsMenu ? 0.48f : 0.38f;
+    label.textPadY = 0.0f;
+    const float baseTextScale = pFontTemplate->textScale;
     label.textScale = baseTextScale;
-    label.textPadX = potionsMenu ? 52.0f : 32.0f;
+    label.textPadX = layout.iconBoxWidth + 9.0f;
     const GameplayInputFrame *pInput = context.currentGameplayInputFrame();
     for (size_t row = 0; row < visibleRows; ++row)
     {
@@ -570,32 +570,15 @@ void renderScrollMenu(GameplayScreenRuntime &context, int width, int height)
         if (hasEntry)
         {
             const ItemDefinition *pDefinition = context.itemTable()->get(entries[entryIndex].objectDescriptionId);
-            if (pDefinition != nullptr && !pDefinition->iconName.empty())
+            if (pDefinition != nullptr)
             {
-                const std::optional<GameplayHudTextureHandle> itemIcon =
-                    context.gameplayUiRuntime().ensureItemIconTextureLoaded(pDefinition->iconName);
-                if (itemIcon)
-                {
-                    const float iconSize = 20.0f * scale;
-                    const float iconX = rowRect.x + 5.0f * scale;
-                    float iconWidth = iconSize;
-                    float iconHeight = iconSize;
-                    if (potionsMenu && itemIcon->width > 0 && itemIcon->height > 0)
-                    {
-                        const float maxWidth = 42.0f * scale;
-                        const float maxHeight = 54.0f * scale;
-                        const float aspect = static_cast<float>(itemIcon->width) / itemIcon->height;
-                        iconWidth = maxWidth;
-                        iconHeight = iconWidth / aspect;
-                        if (iconHeight > maxHeight)
-                        {
-                            iconHeight = maxHeight;
-                            iconWidth = iconHeight * aspect;
-                        }
-                    }
-                    const float iconY = rowRect.y + (rowRect.height - iconHeight) * 0.5f;
-                    context.submitHudTexturedQuad(*itemIcon, iconX, iconY, iconWidth, iconHeight);
-                }
+                renderFittedItemIcon(
+                    context,
+                    pDefinition->iconName,
+                    rowRect.x + 4.0f * scale,
+                    rowRect.y + (rowRect.height - layout.iconBoxHeight * scale) * 0.5f,
+                    layout.iconBoxWidth * scale,
+                    layout.iconBoxHeight * scale);
             }
         }
 
