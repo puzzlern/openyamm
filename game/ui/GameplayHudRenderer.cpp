@@ -388,34 +388,51 @@ struct TurnButtonContent
     uint32_t badgeColorAbgr = 0;
     // Marks a button that opens a menu upwards.
     bool menuArrow = false;
-    // A parchment oval behind the icon, so spellbook illustrations sit on the page colour they were drawn for.
-    bool iconGlow = false;
+    // A page drawn behind the icon, e.g. the spellbook page a spell's art belongs on, with the texture rectangle that
+    // lines up with the icon's drawn bounds.
+    std::optional<GameplayHudTextureHandle> backing;
+    float backingU0 = 0.0f;
+    float backingV0 = 0.0f;
+    float backingU1 = 1.0f;
+    float backingV1 = 1.0f;
 };
 
-// A parchment-coloured oval like the spellbook's page: a solid core with a half-transparent outer ring as the fade.
-// Each ellipse is drawn as thin horizontal strips; the HUD has no blur or radial texture to draw this with.
-void renderParchmentGlow(GameplayScreenRuntime &context, float centerX, float centerY, float radiusX, float radiusY)
+// The backing texture cut to an oval around the icon, fading out over its outer rings. Each ring is a stack of thin
+// horizontal strips whose texture coordinates continue the icon's, so the icon sits on its own patch of the page.
+void renderIconBacking(
+    GameplayScreenRuntime &context,
+    const TurnButtonContent &content,
+    const GameplayResolvedHudLayoutElement &iconRect,
+    float radiusX,
+    float radiusY)
 {
-    // Averaged from the spellbook page art (sbf000), RGB 236, 204, 146.
-    constexpr uint32_t ParchmentAbgr = 0x0092ccecu;
+    if (!content.backing || iconRect.width <= 0.0f || iconRect.height <= 0.0f)
+    {
+        return;
+    }
+    const float centerX = iconRect.x + iconRect.width * 0.5f;
+    const float centerY = iconRect.y + iconRect.height * 0.5f;
+    const auto u = [&](float x)
+    {
+        return std::clamp(content.backingU0 + (x - iconRect.x) / iconRect.width * (content.backingU1 - content.backingU0),
+            0.0f, 1.0f);
+    };
+    const auto v = [&](float y)
+    {
+        return std::clamp(content.backingV0 + (y - iconRect.y) / iconRect.height * (content.backingV1 - content.backingV0),
+            0.0f, 1.0f);
+    };
+    // Outermost first; each smaller, more opaque oval covers the middle of the last. The alphas stack to an even ramp
+    // (1/8, 2/8 ... of the page) from the rim to the solid core.
     const struct
     {
         float fraction;
         uint32_t alpha;
-    } layers[] = {{1.0f, 0x80u}, {0.85f, 0xffu}};
-    if (radiusX <= 0.0f || radiusY <= 0.0f)
-    {
-        return;
-    }
+    } layers[] = {{1.0f, 0x20u}, {0.94f, 0x24u}, {0.88f, 0x2bu}, {0.82f, 0x33u}, {0.76f, 0x40u}, {0.70f, 0x55u},
+        {0.64f, 0x80u}, {0.58f, 0xffu}};
     std::vector<GameplayHudBatchQuad> quads;
     for (const auto &layer : layers)
     {
-        const std::optional<GameplayHudPaletteColor> color =
-            context.gameplayUiRuntime().ensureHudPaletteColor((layer.alpha << 24) | ParchmentAbgr);
-        if (!color)
-        {
-            continue;
-        }
         const float layerRadiusY = radiusY * layer.fraction;
         const int rows = std::max(4, static_cast<int>(std::ceil(2.0f * layerRadiusY / 1.5f)));
         const float rowHeight = 2.0f * layerRadiusY / static_cast<float>(rows);
@@ -423,8 +440,18 @@ void renderParchmentGlow(GameplayScreenRuntime &context, float centerX, float ce
         {
             const float t = ((static_cast<float>(row) + 0.5f) * rowHeight - layerRadiusY) / layerRadiusY;
             const float halfWidth = radiusX * layer.fraction * std::sqrt(std::max(0.0f, 1.0f - t * t));
-            quads.push_back(gameplayHudPaletteQuad(*color, centerX - halfWidth,
-                centerY - layerRadiusY + static_cast<float>(row) * rowHeight, 2.0f * halfWidth, rowHeight));
+            GameplayHudBatchQuad quad;
+            quad.textureHandle = content.backing->textureHandle;
+            quad.x = centerX - halfWidth;
+            quad.y = centerY - layerRadiusY + static_cast<float>(row) * rowHeight;
+            quad.width = 2.0f * halfWidth;
+            quad.height = rowHeight;
+            quad.u0 = u(quad.x);
+            quad.u1 = u(quad.x + quad.width);
+            quad.v0 = v(quad.y);
+            quad.v1 = v(quad.y + quad.height);
+            quad.tintAbgr = (layer.alpha << 24) | 0x00ffffffu;
+            quads.push_back(quad);
         }
     }
     context.submitHudQuadBatch(quads);
@@ -445,23 +472,19 @@ void renderTurnButton(
     const float scale = rect.scale;
     const float pressOffset = pressed ? scale : 0.0f;
 
-    const float iconX = rect.x + 5.0f * scale;
+    const float iconX = rect.x + 4.0f * scale;
     const float iconY = rect.y + 4.0f * scale + pressOffset;
-    const float iconWidth = 26.0f * scale;
+    const float iconWidth = 38.0f * scale;
     const float iconHeight = rect.height - 8.0f * scale;
     const std::optional<GameplayHudTextureHandle> &icon = content.icon;
-    if (icon && content.iconGlow)
-    {
-        // Kept inside the plate: the icon box sits 5 units in from the left edge.
-        renderParchmentGlow(context, iconX + iconWidth * 0.5f, iconY + iconHeight * 0.5f, 17.0f * scale, 15.0f * scale);
-    }
     if (icon && icon->width > 0 && icon->height > 0)
     {
         const float fit = std::min(iconWidth / icon->width, iconHeight / icon->height);
-        const float drawWidth = icon->width * fit;
-        const float drawHeight = icon->height * fit;
-        context.submitHudTexturedQuad(*icon, iconX + (iconWidth - drawWidth) * 0.5f,
-            iconY + (iconHeight - drawHeight) * 0.5f, drawWidth, drawHeight);
+        const GameplayResolvedHudLayoutElement drawRect = {iconX + (iconWidth - icon->width * fit) * 0.5f,
+            iconY + (iconHeight - icon->height * fit) * 0.5f, icon->width * fit, icon->height * fit, scale};
+        // The oval stays inside the plate: the icon box's centre is 23 units from its left edge.
+        renderIconBacking(context, content, drawRect, 22.5f * scale, rect.height * 0.5f - scale);
+        context.submitHudTexturedQuad(*icon, drawRect.x, drawRect.y, drawRect.width, drawRect.height);
     }
 
     const UiLayoutManager::LayoutElement *pTitleTemplate = context.findHudLayoutElement("ObsidianTurnPhase");
@@ -484,7 +507,7 @@ void renderTurnButton(
                 arrowSize, scale});
     }
 
-    const float textX = rect.x + 35.0f * scale;
+    const float textX = rect.x + 46.0f * scale;
     const float textWidth = rect.x + rect.width - (content.menuArrow ? arrowSize + 6.0f * scale : 5.0f * scale) - textX;
     const auto drawRow = [&](const UiLayoutManager::LayoutElement *pTemplate, float y, float rowHeight,
                              const std::string &text)
@@ -578,40 +601,78 @@ const ItemDefinition *attackWeaponPreview(GameplayScreenRuntime &context)
     return pOffHand != nullptr && pOffHand->equipStat.rfind("Weapon", 0) == 0 ? pOffHand : nullptr;
 }
 
-// The bound attack spell's coloured spellbook art (as when highlighted in the book), while the active character can
-// pay its mana: the attack casts it then instead of swinging.
-std::optional<GameplayHudTextureHandle> attackSpellPreview(GameplayScreenRuntime &context)
+// The bound attack spell's coloured spellbook art (as when highlighted in the book) on its patch of the school's page,
+// while the active character can pay its mana: the attack casts it then instead of swinging. Leaves content alone
+// and returns false otherwise.
+bool applyAttackSpellPreview(GameplayScreenRuntime &context, int width, int height, TurnButtonContent &content)
 {
     const Party *pParty = context.partyReadOnly();
     const SpellTable *pSpellTable = context.spellTable();
     const Character *pCharacter = pParty != nullptr ? pParty->activeMember() : nullptr;
     if (pCharacter == nullptr || pSpellTable == nullptr || pCharacter->attackSpellName.empty())
     {
-        return std::nullopt;
+        return false;
     }
     const SpellEntry *pSpell = pSpellTable->findByName(pCharacter->attackSpellName);
     if (pSpell == nullptr)
     {
-        return std::nullopt;
+        return false;
     }
     const uint32_t spellId = static_cast<uint32_t>(pSpell->id);
     const std::optional<uint32_t> manaCost = PartySpellSystem::manaCost(*pCharacter, *pSpellTable, spellId);
     if (manaCost && !pParty->canSpendSpellPoints(pParty->activeMemberIndex(), static_cast<int>(*manaCost)))
     {
-        return std::nullopt;
+        return false;
     }
     const SpellbookSchoolUiDefinition *pSchool = findSpellbookSchoolUiDefinitionForSpellId(spellId);
-    const UiLayoutManager::LayoutElement *pLayout = pSchool != nullptr
-        ? context.findHudLayoutElement(spellbookSpellLayoutId(pSchool->school, spellId - pSchool->firstSpellId + 1))
-        : nullptr;
+    if (pSchool == nullptr)
+    {
+        return false;
+    }
+    const std::string spellLayoutId = spellbookSpellLayoutId(pSchool->school, spellId - pSchool->firstSpellId + 1);
+    const UiLayoutManager::LayoutElement *pLayout = context.findHudLayoutElement(spellLayoutId);
     if (pLayout == nullptr)
     {
-        return std::nullopt;
+        return false;
     }
     // Same choice as the spellbook's selected spell.
     const std::string &asset = !pLayout->pressedAsset.empty() ? pLayout->pressedAsset
         : !pLayout->hoverAsset.empty() ? pLayout->hoverAsset : pLayout->primaryAsset;
-    return context.gameplayUiRuntime().ensureHudTextureLoaded(asset);
+    content.icon = context.gameplayUiRuntime().ensureHudTextureLoaded(asset);
+    if (!content.icon)
+    {
+        return false;
+    }
+
+    // Where the spell sits on its page, as fractions of the page, from the book's own layout.
+    const UiLayoutManager::LayoutElement *pPageLayout = context.findHudLayoutElement(pSchool->pPageLayoutId);
+    const std::optional<GameplayResolvedHudLayoutElement> page =
+        context.resolveHudLayoutElement(pSchool->pPageLayoutId, width, height, 0, 0);
+    const std::optional<GameplayResolvedHudLayoutElement> spell =
+        context.resolveHudLayoutElement(spellLayoutId, width, height, 0, 0);
+    if (pPageLayout == nullptr || pPageLayout->width <= 0.0f || pPageLayout->height <= 0.0f)
+    {
+        return true;
+    }
+    content.backing = context.gameplayUiRuntime().ensureHudTextureLoaded(pPageLayout->primaryAsset);
+    if (page && spell && page->width > 0.0f && page->height > 0.0f)
+    {
+        content.backingU0 = (spell->x - page->x) / page->width;
+        content.backingV0 = (spell->y - page->y) / page->height;
+        content.backingU1 = (spell->x + spell->width - page->x) / page->width;
+        content.backingV1 = (spell->y + spell->height - page->y) / page->height;
+    }
+    else
+    {
+        // Spells are centre-anchored on their page (spellbook.yml).
+        const float centerX = pPageLayout->width * 0.5f + pLayout->offsetX;
+        const float centerY = pPageLayout->height * 0.5f + pLayout->offsetY;
+        content.backingU0 = (centerX - pLayout->width * 0.5f) / pPageLayout->width;
+        content.backingV0 = (centerY - pLayout->height * 0.5f) / pPageLayout->height;
+        content.backingU1 = (centerX + pLayout->width * 0.5f) / pPageLayout->width;
+        content.backingV1 = (centerY + pLayout->height * 0.5f) / pPageLayout->height;
+    }
+    return true;
 }
 
 // The turn indicator itself: the current stage, with the attack hotkey or the movement points left.
@@ -630,9 +691,7 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     }
     const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
     TurnButtonContent content;
-    content.icon = attackSpellPreview(context);
-    content.iconGlow = content.icon.has_value();
-    if (!content.icon)
+    if (!applyAttackSpellPreview(context, width, height, content))
     {
         content.icon = itemIcon(context, attackWeaponPreview(context));
     }

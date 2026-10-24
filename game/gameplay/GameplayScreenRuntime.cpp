@@ -4448,14 +4448,17 @@ std::optional<GameplayResolvedHudLayoutElement> GameplayScreenRuntime::resolveCh
         return applyVisualPlacement(rect);
     }
 
+    // The female doll's bow anchor sits left of centre on her back; bow and wand move right onto the shoulder line
+    // (about a wand shaft's width).
+    constexpr uint32_t FemaleDollTypeId = 1;
+    const int femaleBackShiftX = pCharacterDollType != nullptr && pCharacterDollType->id == FemaleDollTypeId ? 8 : 0;
+
     if (slot == EquipmentSlot::Wand)
     {
-        // Behind the shoulder, relative to the bow anchor. The female doll's bow anchor sits further left than the
-        // male one's, which would leave the wand under the main weapon, so it moves right to match.
-        constexpr uint32_t FemaleDollTypeId = 1;
+        // Behind the shoulder, relative to the bow anchor.
         const int bowX = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetX : 0;
         const int bowY = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetY : 0;
-        const int wandOffsetX = pCharacterDollType != nullptr && pCharacterDollType->id == FemaleDollTypeId ? -35 : -44;
+        const int wandOffsetX = femaleBackShiftX != 0 ? -35 + femaleBackShiftX : -44;
         const int wandOffsetY = 8;
         GameplayResolvedHudLayoutElement rect = {};
         rect.x = std::round(resolved->x + static_cast<float>(bowX + wandOffsetX) * resolved->scale - iconWidth * 0.5f);
@@ -4470,7 +4473,8 @@ std::optional<GameplayResolvedHudLayoutElement> GameplayScreenRuntime::resolveCh
     {
         GameplayResolvedHudLayoutElement rect = {};
         rect.x = std::round(
-            resolved->x + static_cast<float>(pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetX : 0)
+            resolved->x
+            + static_cast<float>((pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetX : 0) + femaleBackShiftX)
             * resolved->scale - iconWidth * 0.5f);
         rect.y = std::round(
             resolved->y + static_cast<float>(pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetY : 0)

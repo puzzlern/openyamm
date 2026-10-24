@@ -1012,7 +1012,7 @@ elements:
   anchor: bottom_right
   offset_x: -8
   offset_y: -53.866667
-  width: 96
+  width: 104
   height: 39.466667
   scale:
     min: 0.5
@@ -1025,7 +1025,7 @@ elements:
   anchor: bottom_right
   offset_x: -8
   offset_y: -12.266667
-  width: 96
+  width: 104
   height: 39.466667
   scale:
     min: 0.5
@@ -1607,14 +1607,14 @@ elements:
   anchor: bottom_left
   offset_x: 14.933333
   offset_y: -15.466667
-  width: 89.6
+  width: 97.6
   height: 33.066667
   children:
   - id: ObsidianTurnPlate
     anchor: top_left
     offset_x: -3.2
     offset_y: -3.2
-    width: 96
+    width: 104
     height: 39.46666666666667
     asset:
       default: obsidian_hud_turn_normal
@@ -1649,7 +1649,7 @@ elements:
     anchor: top_left
     offset_x: -3.2
     offset_y: -44.8
-    width: 96
+    width: 104
     height: 39.466667
     interactive: true
     notes: Pass / End Movement, stacked above the turn plate while the party can pass.
@@ -1657,7 +1657,7 @@ elements:
     anchor: top_left
     offset_x: -3.2
     offset_y: -86.4
-    width: 96
+    width: 104
     height: 39.466667
     interactive: true
     notes: Use the equipped wand, stacked above Pass (takes Pass's slot while Pass is hidden).
