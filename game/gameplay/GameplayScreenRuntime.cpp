@@ -4450,11 +4450,16 @@ std::optional<GameplayResolvedHudLayoutElement> GameplayScreenRuntime::resolveCh
 
     if (slot == EquipmentSlot::Wand)
     {
+        // Behind the shoulder, relative to the bow anchor. The female doll's bow anchor sits further left than the
+        // male one's, which would leave the wand under the main weapon, so it moves right to match.
+        constexpr uint32_t FemaleDollTypeId = 1;
         const int bowX = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetX : 0;
         const int bowY = pCharacterDollType != nullptr ? pCharacterDollType->bowOffsetY : 0;
+        const int wandOffsetX = pCharacterDollType != nullptr && pCharacterDollType->id == FemaleDollTypeId ? -35 : -44;
+        const int wandOffsetY = 8;
         GameplayResolvedHudLayoutElement rect = {};
-        rect.x = std::round(resolved->x + static_cast<float>(bowX - 44) * resolved->scale - iconWidth * 0.5f);
-        rect.y = std::round(resolved->y + static_cast<float>(bowY - 30) * resolved->scale - iconHeight * 0.5f);
+        rect.x = std::round(resolved->x + static_cast<float>(bowX + wandOffsetX) * resolved->scale - iconWidth * 0.5f);
+        rect.y = std::round(resolved->y + static_cast<float>(bowY + wandOffsetY) * resolved->scale - iconHeight * 0.5f);
         rect.width = iconWidth;
         rect.height = iconHeight;
         rect.scale = resolved->scale;

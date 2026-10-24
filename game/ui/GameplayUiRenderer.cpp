@@ -1111,16 +1111,7 @@ void GameplayUiRenderer::renderGameplayHudArt(GameplayScreenRuntime &context, in
     }
 #endif
 
-    if (hudScreenState == GameplayHudScreenState::Gameplay && context.turnBasedCombatRuntime().active())
-    {
-        flushQueuedHudQuads();
-        draw("ObsidianTurnPlate");
-        const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
-        label("ObsidianTurnPhase", turn.stage() == TurnBasedCombatStage::Movement ? "Movement"
-            : turn.stage() == TurnBasedCombatStage::Attack ? "Attack" : "Waiting");
-        label("ObsidianTurnDetail", turn.stage() == TurnBasedCombatStage::Movement
-            ? std::to_string(turn.movementActionPoints()) + " AP" : "Turn based");
-    }
+    // The turn indicator draws with the other turn buttons in GameplayHudRenderer.
 
     flushQueuedHudQuads();
     if (!isLimitedOverlayHud)
