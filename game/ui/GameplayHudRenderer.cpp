@@ -1,6 +1,9 @@
 #include "game/ui/GameplayHudRenderer.h"
 
 #include "game/app/KeyboardBindings.h"
+#include "game/party/PartySpellSystem.h"
+#include "game/tables/SpellTable.h"
+#include "game/ui/SpellbookUiLayout.h"
 
 #include "game/gameplay/GameplayScreenRuntime.h"
 #include "game/gameplay/GameplayInputFrame.h"
@@ -530,6 +533,42 @@ const ItemDefinition *attackWeaponPreview(GameplayScreenRuntime &context)
     return pOffHand != nullptr && pOffHand->equipStat.rfind("Weapon", 0) == 0 ? pOffHand : nullptr;
 }
 
+// The bound attack spell's coloured spellbook art (as when highlighted in the book), while the active character can
+// pay its mana: the attack casts it then instead of swinging.
+std::optional<GameplayHudTextureHandle> attackSpellPreview(GameplayScreenRuntime &context)
+{
+    const Party *pParty = context.partyReadOnly();
+    const SpellTable *pSpellTable = context.spellTable();
+    const Character *pCharacter = pParty != nullptr ? pParty->activeMember() : nullptr;
+    if (pCharacter == nullptr || pSpellTable == nullptr || pCharacter->attackSpellName.empty())
+    {
+        return std::nullopt;
+    }
+    const SpellEntry *pSpell = pSpellTable->findByName(pCharacter->attackSpellName);
+    if (pSpell == nullptr)
+    {
+        return std::nullopt;
+    }
+    const uint32_t spellId = static_cast<uint32_t>(pSpell->id);
+    const std::optional<uint32_t> manaCost = PartySpellSystem::manaCost(*pCharacter, *pSpellTable, spellId);
+    if (manaCost && !pParty->canSpendSpellPoints(pParty->activeMemberIndex(), static_cast<int>(*manaCost)))
+    {
+        return std::nullopt;
+    }
+    const SpellbookSchoolUiDefinition *pSchool = findSpellbookSchoolUiDefinitionForSpellId(spellId);
+    const UiLayoutManager::LayoutElement *pLayout = pSchool != nullptr
+        ? context.findHudLayoutElement(spellbookSpellLayoutId(pSchool->school, spellId - pSchool->firstSpellId + 1))
+        : nullptr;
+    if (pLayout == nullptr)
+    {
+        return std::nullopt;
+    }
+    // Same choice as the spellbook's selected spell.
+    const std::string &asset = !pLayout->pressedAsset.empty() ? pLayout->pressedAsset
+        : !pLayout->hoverAsset.empty() ? pLayout->hoverAsset : pLayout->primaryAsset;
+    return context.gameplayUiRuntime().ensureHudTextureLoaded(asset);
+}
+
 // The turn indicator itself: the current stage, with the attack hotkey or the movement points left.
 void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
 {
@@ -546,7 +585,11 @@ void renderTurnIndicator(GameplayScreenRuntime &context, int width, int height)
     }
     const TurnBasedCombatRuntime &turn = context.turnBasedCombatRuntime();
     TurnButtonContent content;
-    content.icon = itemIcon(context, attackWeaponPreview(context));
+    content.icon = attackSpellPreview(context);
+    if (!content.icon)
+    {
+        content.icon = itemIcon(context, attackWeaponPreview(context));
+    }
     if (turn.stage() == TurnBasedCombatStage::Movement)
     {
         content.title = "Move";
