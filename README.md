@@ -1,5 +1,9 @@
 # OpenYAMM
 
+> **This branch is a mod:** OpenYAMM 1.11 with a wand slot, quick scroll and potion menus, and reworked turn-based
+> combat buttons. See **[WAND_SCROLL_MOD.md](WAND_SCROLL_MOD.md)** for what it adds and how to install it on your own
+> copy of the game. The rest of this README is the original OpenYAMM one.
+
 OpenYAMM is Open Yet Another Might and Magic: a modern C++ reimplementation of
 Might and Magic VI, VII, and VIII, inspired by MMMerge and built on an engine
 that started from Might and Magic VIII.
