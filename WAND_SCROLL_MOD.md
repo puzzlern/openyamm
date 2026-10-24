@@ -46,7 +46,7 @@ shows an icon, a name and its hotkey, read from your current key bindings, so re
 All buttons share the turn indicator's plain dark plate and fonts, and the column stays clear of the portrait bar on
 narrow screens.
 
-### Bug fix
+### Bug fixes
 
 - **Life Drain (and other direct-hit spells) said "No valid target exists!" outdoors** when cast as an attack spell or
   quick spell at a monster that hadn't noticed the party yet. Outdoors now targets the monster you point at, as
