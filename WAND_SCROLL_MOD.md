@@ -40,8 +40,8 @@ shows an icon, a name and its hotkey, read from your current key bindings, so re
   same as the hotkey, against the nearest enemy. In the official game a click here left turn-based mode; the
   **Combat** key (Enter) still does that.
 - **Pass** / **End Move** (default **B**), with Lord Kilburn's Shield.
-- **Wand** shows the equipped wand and, once the wand is identified, its remaining charges (red at 0). It drops into
-  Pass's slot when Pass isn't available, so the column never has a gap.
+- **Wand** shows the equipped wand and its remaining charges, like a stack count: *Wand (38)*, or *Wand (?)* while
+  the wand is unidentified. It drops into Pass's slot when Pass isn't available, so the column never has a gap.
 
 All buttons share the turn indicator's plain dark plate and fonts, and the column stays clear of the portrait bar on
 narrow screens.

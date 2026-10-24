@@ -383,9 +383,6 @@ struct TurnButtonContent
     std::optional<GameplayHudTextureHandle> icon;
     std::string title;
     std::string detail;
-    // Small count in the icon's corner, e.g. wand charges.
-    std::string badge;
-    uint32_t badgeColorAbgr = 0;
     // Marks a button that opens a menu upwards.
     bool menuArrow = false;
     // A page drawn behind the icon, e.g. the spellbook page a spell's art belongs on, with the texture rectangle that
@@ -489,16 +486,6 @@ void renderTurnButton(
 
     const UiLayoutManager::LayoutElement *pTitleTemplate = context.findHudLayoutElement("ObsidianTurnPhase");
     const UiLayoutManager::LayoutElement *pDetailTemplate = context.findHudLayoutElement("ObsidianTurnDetail");
-    if (!content.badge.empty() && pDetailTemplate != nullptr)
-    {
-        UiLayoutManager::LayoutElement badge = *pDetailTemplate;
-        badge.textAlignX = UiLayoutManager::TextAlignX::Right;
-        badge.textColorAbgr = content.badgeColorAbgr != 0 ? content.badgeColorAbgr : pDetailTemplate->textColorAbgr;
-        context.renderLayoutLabel(
-            badge, {iconX, iconY + iconHeight - 9.6f * scale, iconWidth + 2.0f * scale, 9.6f * scale, scale},
-            content.badge, false);
-    }
-
     const float arrowSize = 9.0f * scale;
     if (content.menuArrow)
     {
@@ -764,13 +751,11 @@ void renderUseWandButton(GameplayScreenRuntime &context, int width, int height)
 
     TurnButtonContent content;
     content.icon = itemIcon(context, context.itemTable()->get(pParty->equippedItemId(memberIndex, slot)));
-    content.title = "Wand";
+    // Charges read like a stack count, "Wand (38)"; an unidentified wand keeps them hidden, "Wand (?)".
+    content.title = "Wand ("
+        + (pRuntime != nullptr && pRuntime->identified ? std::to_string(pRuntime->currentCharges) : std::string("?"))
+        + ")";
     content.detail = hotkeyLabel(context, KeyboardAction::UseWand);
-    if (pRuntime != nullptr && pRuntime->identified)
-    {
-        content.badge = std::to_string(pRuntime->currentCharges);
-        content.badgeColorAbgr = pRuntime->currentCharges == 0 ? GameplayUiSkin::Penalty : 0;
-    }
     renderTurnButton(context, *rect, content, hovered, pressed, false);
 }
 
