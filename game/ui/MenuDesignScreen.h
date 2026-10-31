@@ -42,6 +42,10 @@ class MenuDesignScreen : public MenuScreenBase
                  std::vector<std::string> choiceIcons = {});
     void drawConfirmation();
     bool modalOpen() const;
+    // A screen's own modal: while open, controls behind it go inert; its controls draw between begin and end.
+    void setCustomModal(bool open);
+    void beginCustomModal();
+    void endCustomModal();
     void closeConfirmation();
     void setModalBody(const std::string &text);
     // Release notes for the open confirmation: a left-aligned box between its title and body that scrolls when long.
@@ -87,5 +91,6 @@ class MenuDesignScreen : public MenuScreenBase
     std::optional<Confirmation> m_confirmation;
     bool m_drawingConfirmation = false;
     bool m_confirmationNew = false;
+    bool m_customModal = false;
 };
 } // namespace OpenYAMM::Game

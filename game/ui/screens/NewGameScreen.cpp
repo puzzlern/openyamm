@@ -607,6 +607,11 @@ void NewGameScreen::onEnter()
     m_characterCreationInitialized = false;
     m_selectedContinent = {};
     m_rulesPanelOpen = false;
+    if (m_portraitPicker != PortraitPicker::Closed)
+    {
+        m_portraitPicker = PortraitPicker::Closed;
+        setCustomModal(false);
+    }
     loadRulesets();
 }
 
@@ -1602,15 +1607,14 @@ std::vector<int> NewGameScreen::availableVoiceIdsForSelectedCandidate() const
 
 void NewGameScreen::cycleCandidate(int direction)
 {
-    endNameEditing(true);
     const int count = static_cast<int>(candidateCount());
 
     if (count <= 0)
     {
+        endNameEditing(true);
         return;
     }
 
-    const uint32_t previousClassId = m_state.selectedClassId;
     int nextIndex = static_cast<int>(m_state.selectedCandidateIndex) + direction;
 
     if (nextIndex < 0)
@@ -1622,7 +1626,20 @@ void NewGameScreen::cycleCandidate(int direction)
         nextIndex -= count;
     }
 
-    resetStateForCandidate(static_cast<size_t>(nextIndex));
+    selectCandidate(static_cast<size_t>(nextIndex));
+}
+
+void NewGameScreen::selectCandidate(size_t candidateIndex)
+{
+    endNameEditing(true);
+
+    if (candidateCount() == 0)
+    {
+        return;
+    }
+
+    const uint32_t previousClassId = m_state.selectedClassId;
+    resetStateForCandidate(candidateIndex);
 
     if (!isGodLichSelected())
     {
@@ -1669,33 +1686,6 @@ void NewGameScreen::cycleClass(int direction)
     m_state.statusMessage.clear();
 }
 
-void NewGameScreen::cycleVoice(int direction)
-{
-    endNameEditing(true);
-    std::vector<int> voiceIds = availableVoiceIdsForSelectedCandidate();
-
-    if (voiceIds.empty())
-    {
-        return;
-    }
-
-    auto currentIt = std::find(voiceIds.begin(), voiceIds.end(), m_state.selectedVoiceId);
-    int currentIndex = currentIt != voiceIds.end() ? static_cast<int>(currentIt - voiceIds.begin()) : 0;
-    currentIndex += direction;
-
-    if (currentIndex < 0)
-    {
-        currentIndex = static_cast<int>(voiceIds.size()) - 1;
-    }
-    else if (currentIndex >= static_cast<int>(voiceIds.size()))
-    {
-        currentIndex = 0;
-    }
-
-    m_state.selectedVoiceId = voiceIds[static_cast<size_t>(currentIndex)];
-    m_state.statusMessage.clear();
-}
-
 Character NewGameScreen::buildVoicePreviewCharacter() const
 {
     Character character = {};
@@ -1721,6 +1711,8 @@ Character NewGameScreen::buildVoicePreviewCharacter() const
 
 void NewGameScreen::playVoicePreview()
 {
+    m_voiceLineIndex = 0;
+
     if (m_pGameAudioSystem == nullptr)
     {
         return;
@@ -2778,16 +2770,6 @@ void NewGameScreen::drawScreen(float deltaSeconds)
         cycleCandidate(1);
         playVoicePreview();
     }
-    if (action("CharacterCreationVoiceLeftButton"))
-    {
-        cycleVoice(-1);
-        playVoicePreview();
-    }
-    if (action("CharacterCreationVoiceRightButton"))
-    {
-        cycleVoice(1);
-        playVoicePreview();
-    }
     if (action("CharacterCreationResetCharacterButton"))
     {
         resetCurrentState(true);
@@ -2836,12 +2818,39 @@ void NewGameScreen::drawScreen(float deltaSeconds)
             }
         }
     }
-    label("CharacterCreationVoiceValue",
-          "Voice " + std::to_string(m_state.selectedVoiceId) + " - " + selectedCandidate().raceName);
+    // The voice: a dropdown where the arrows were, and a play button stepping through everything the voice says.
+    {
+        const Rect left = designRect("CharacterCreationVoiceLeftButton");
+        const Rect playRect = designRect("CharacterCreationVoiceRightButton");
+        const Rect voiceRect{left.x, left.y, playRect.x - 3 * designScale() - left.x, left.height};
+        const std::vector<int> voiceIds = availableVoiceIdsForSelectedCandidate();
+        if (selectBox("voice", voiceRect, "Voice " + std::to_string(m_state.selectedVoiceId), !voiceIds.empty()))
+        {
+            openPortraitPicker(PortraitPicker::Voice);
+        }
+        if (button("voice-play", playRect, "", "button_square", !voiceIds.empty()) && m_pGameAudioSystem != nullptr)
+        {
+            endNameEditing(true);
+            m_pGameAudioSystem->playVoiceLine(buildVoicePreviewCharacter(), m_voiceLineIndex++,
+                                              CharacterCreationVoicePreviewSpeakerKey);
+        }
+        // A play triangle, drawn a pixel column at a time.
+        const float triangleWidth = std::floor(7 * designScale());
+        const float triangleHeight = 8 * designScale();
+        const float triangleX = std::floor(playRect.x + (playRect.width - triangleWidth) / 2 + designScale());
+        const float centerY = playRect.y + playRect.height / 2;
+        const uint32_t triangleColor =
+            !modalOpen() && pointerInside(playRect) ? 0xffc0f0ffu : 0xffa4d1e8u;
+        for (float column = 0; column < triangleWidth; ++column)
+        {
+            const float height = triangleHeight * (1 - column / triangleWidth);
+            drawSolidRect({triangleX + column, centerY - height / 2, 1, height}, triangleColor);
+        }
+    }
     // The race card (MAW: the race's skill bonuses, resistances and immunities).
     if (rightMouseDown() && !modalOpen()
         && (pointerInside(designRect("CharacterCreationPortraitImage"))
-            || pointerInside(designRect("CharacterCreationVoiceValue"))))
+            || pointerInside(designRect("CharacterCreationRaceValue"))))
     {
         const Character character = buildCharacter();
         const std::vector<std::string> notes = creationRules().classes.raceNotes(character);
@@ -2865,11 +2874,35 @@ void NewGameScreen::drawScreen(float deltaSeconds)
     {
         drawTexture(portraitTextureNameForEntry(*pEntry), designRect("CharacterCreationPortraitImage"));
         const Rect portrait = designRect("CharacterCreationPortraitImage");
+        // A click on the portrait opens the picker of every portrait.
+        const bool pickable = !modalOpen() && candidateCount() > 1 && pointerInside(portrait);
+        if (pickable && leftMouseJustPressed())
+        {
+            openPortraitPicker(PortraitPicker::Portrait);
+        }
         drawEllipseOutline({portrait.x - 3 * designScale(), portrait.y - 3 * designScale(),
                             portrait.width + 6 * designScale(), portrait.height + 6 * designScale()},
-                           designScale(), 0xff61888eu);
+                           designScale(), pickable ? 0xffc0f0ffu : 0xff61888eu);
         drawEllipseOutline(portrait, 1.1f * designScale(), 0xff85bbd8u);
-        drawTexture(classIconTextureName(selectedClassName()), designRect("CharacterCreationClassEmblem"));
+        // The race under the portrait, the class's icon after it.
+        {
+            constexpr float RaceTextSize = 12.8f;
+            constexpr float IconSize = 16;
+            constexpr float IconGap = 4;
+            const std::string font = "menu_lucida";
+            const std::string race = selectedCandidate().raceName;
+            const float scale = designScale();
+            const Rect line = designRect("CharacterCreationRaceValue");
+            const float textWidth =
+                measureTextWidth(font, race, scale * RaceTextSize / std::max(1, fontHeight(font)));
+            const float width = std::min(line.width, textWidth + (IconGap + IconSize) * scale);
+            const float x = line.x + (line.width - width) / 2;
+            const float textRoom = width - (IconGap + IconSize) * scale;
+            textInRect({x, line.y, textRoom + scale, line.height}, race, font, RaceTextSize, 0xffa4d1e8u);
+            drawTexture(classIconTextureName(selectedClassName()),
+                        {x + textRoom + IconGap * scale, line.y + (line.height - IconSize * scale) / 2,
+                         IconSize * scale, IconSize * scale});
+        }
         const std::string compositeKey = std::to_string(pEntry->id) + ":" + pEntry->bodyAsset;
         if (compositeKey != m_creationPreviewDollCacheKey)
         {
@@ -3089,7 +3122,180 @@ void NewGameScreen::drawScreen(float deltaSeconds)
             }
         }
     }
+    drawPortraitPicker();
     drawConfirmation();
+}
+
+void NewGameScreen::openPortraitPicker(PortraitPicker picker)
+{
+    endNameEditing(true);
+    m_portraitPicker = picker;
+    m_portraitPickerNew = true;
+    setCustomModal(true);
+}
+
+void NewGameScreen::drawPortraitPicker()
+{
+    if (m_portraitPicker == PortraitPicker::Closed)
+    {
+        return;
+    }
+    // One cell per candidate; for voices, one per voice under the portrait it first belongs to, with its number.
+    struct PickerCell
+    {
+        const CharacterDollEntry *pEntry = nullptr;
+        std::string number;
+        std::string caption;
+        bool selected = false;
+    };
+    const bool voices = m_portraitPicker == PortraitPicker::Voice;
+    const std::vector<int> voiceIds = voices ? availableVoiceIdsForSelectedCandidate() : std::vector<int>{};
+    const CharacterDollEntry *pSelectedEntry = selectedCharacterEntry();
+    std::vector<PickerCell> cells;
+    for (size_t index = 0; !voices && index < candidateCount(); ++index)
+    {
+        const CreationCandidate &candidate = candidateAt(index);
+        cells.push_back({m_pGameData->characterDollTable().getCharacter(candidate.characterDataId), {},
+                         candidate.raceName.empty() ? candidate.defaultName
+                                                    : candidate.raceName + " - " + displayClassName(candidate.className),
+                         index == m_state.selectedCandidateIndex});
+    }
+    for (const int voiceId : voiceIds)
+    {
+        PickerCell cell{nullptr, std::to_string(voiceId), "Voice " + std::to_string(voiceId),
+                        voiceId == m_state.selectedVoiceId};
+        for (size_t index = 0; index < candidateCount(); ++index)
+        {
+            const CreationCandidate &candidate = candidateAt(index);
+            const CharacterDollEntry *pEntry = m_pGameData->characterDollTable().getCharacter(candidate.characterDataId);
+            if (pEntry != nullptr && pSelectedEntry != nullptr && pEntry->defaultSex == pSelectedEntry->defaultSex
+                && int(pEntry->defaultVoiceId) == voiceId)
+            {
+                cell.pEntry = pEntry;
+                cell.caption += " - " + candidate.raceName;
+                break;
+            }
+        }
+        cells.push_back(std::move(cell));
+    }
+    // Columns grow until there are 2.3 times as many as rows; cells shrink when the rows would not fit.
+    constexpr float MaxCellWidth = 53;
+    constexpr float CellAspect = 1.33f;
+    constexpr float Gap = 5.5f;
+    constexpr float Padding = 22;
+    constexpr float TitleHeight = 40;
+    constexpr float FooterHeight = 30;
+    constexpr float MaxPanelWidth = 710;
+    constexpr float MaxPanelHeight = 440;
+    // Extra frame around the content, on each side.
+    constexpr float MarginX = 30;
+    constexpr float MarginY = 15;
+    const size_t count = cells.size();
+    if (count == 0)
+    {
+        m_portraitPicker = PortraitPicker::Closed;
+        setCustomModal(false);
+        return;
+    }
+    size_t columns = 1;
+    while (columns < count && float(columns) < 2.3f * std::ceil(float(count) / float(columns)))
+    {
+        ++columns;
+    }
+    const size_t rows = (count + columns - 1) / columns;
+    const float slotWidth = std::min({MaxCellWidth,
+        (MaxPanelWidth - 2 * Padding - (columns - 1) * Gap) / columns,
+        ((MaxPanelHeight - 2 * Padding - TitleHeight - FooterHeight - (rows - 1) * Gap) / rows) / CellAspect});
+    const float panelWidth = std::max(320.0f, columns * slotWidth + (columns - 1) * Gap + 2 * Padding);
+    const float panelHeight =
+        rows * slotWidth * CellAspect + (rows - 1) * Gap + 2 * Padding + TitleHeight + FooterHeight;
+    // The panel keeps the full cell size; the cells themselves draw smaller so they stay clear of its frame.
+    constexpr float CellShrink = 0.88f;
+    constexpr float TitleTop = 42;
+    constexpr float GridTop = 72;
+    const float cellWidth = slotWidth * CellShrink;
+    const float cellHeight = cellWidth * CellAspect;
+    const float gridWidth = columns * cellWidth + (columns - 1) * Gap;
+    const float gridHeight = rows * cellHeight + (rows - 1) * Gap;
+    const float scale = designScale();
+    // The content area; the drawn frame adds the margins around it.
+    const Rect panel{(frameWidth() - panelWidth * scale) / 2, (frameHeight() - panelHeight * scale) / 2,
+                     panelWidth * scale, panelHeight * scale};
+    const Rect frame{panel.x - MarginX * scale, panel.y - MarginY * scale, panel.width + 2 * MarginX * scale,
+                     panel.height + 2 * MarginY * scale};
+    loadDesign("menu/confirmation");
+    drawTexture(m_designLayouts.findElement("MenuConfirmationVeil")->primaryAsset,
+                {0, 0, float(frameWidth()), float(frameHeight())});
+    skin("modal", frame);
+    const std::string title = voices ? "Choose Voice" : "Choose Portrait";
+    drawText("Create", title, panel.x + (panel.width - measureTextWidth("Create", title, scale)) / 2,
+             panel.y + TitleTop * scale, GameplayUiSkin::Gold, scale);
+    // The click that opened the picker must not also press the cell under it.
+    if (!m_portraitPickerNew)
+    {
+        beginCustomModal();
+    }
+    std::optional<size_t> chosen;
+    std::string hoveredName;
+    const float gridX = panel.x + (panel.width - gridWidth * scale) / 2;
+    // Below the title, centred in the room left above the footer.
+    const float gridRoom = panelHeight - GridTop - Padding - FooterHeight;
+    const float gridY = panel.y + (GridTop + std::max(0.0f, (gridRoom - gridHeight) / 2)) * scale;
+    for (size_t index = 0; index < count; ++index)
+    {
+        const Rect rect{gridX + float(index % columns) * (cellWidth + Gap) * scale,
+                        gridY + float(index / columns) * (cellHeight + Gap) * scale, cellWidth * scale,
+                        cellHeight * scale};
+        const PickerCell &cell = cells[index];
+        if (button("portrait-pick-" + std::to_string(index), rect, "", "party_slot", true, cell.selected))
+        {
+            chosen = index;
+        }
+        const Rect image{rect.x + 4 * scale, rect.y + 3 * scale, rect.width - 8 * scale, rect.height - 6 * scale};
+        if (cell.pEntry != nullptr)
+        {
+            drawTexture(portraitTextureNameForEntry(*cell.pEntry), image);
+        }
+        if (!cell.number.empty())
+        {
+            drawSolidRect(image, cell.selected ? 0x66000000u : 0x99000000u);
+            textInRect(image, cell.number, "fondamento", 18, 0xffe6f4ffu, true);
+        }
+        if (pointerInside(rect))
+        {
+            outline(rect, 0xffc0f0ffu);
+            hoveredName = cell.caption;
+        }
+    }
+    endCustomModal();
+    if (!hoveredName.empty())
+    {
+        textInRect({panel.x, panel.y + panel.height - (Padding + FooterHeight) * scale, panel.width,
+                    FooterHeight * scale},
+                   hoveredName, "menu_lucida", 12, 0xffc6dfeau, true);
+    }
+    const bool dismissed = !m_portraitPickerNew
+        && (keyPressed(SDL_SCANCODE_ESCAPE) || rightMouseDown() || (leftMouseJustPressed() && !pointerInside(frame)));
+    m_portraitPickerNew = false;
+    if (chosen || dismissed)
+    {
+        m_portraitPicker = PortraitPicker::Closed;
+        setCustomModal(false);
+    }
+    if (chosen && voices)
+    {
+        m_state.selectedVoiceId = voiceIds[*chosen];
+        m_state.statusMessage.clear();
+        playVoicePreview();
+    }
+    else if (chosen)
+    {
+        if (*chosen != m_state.selectedCandidateIndex)
+        {
+            selectCandidate(*chosen);
+        }
+        playVoicePreview();
+    }
 }
 
 } // namespace OpenYAMM::Game

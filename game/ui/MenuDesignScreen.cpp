@@ -45,7 +45,21 @@ bool MenuDesignScreen::textInputActive() const
 }
 bool MenuDesignScreen::modalOpen() const
 {
-    return m_confirmation.has_value();
+    return m_confirmation.has_value() || m_customModal;
+}
+void MenuDesignScreen::setCustomModal(bool open)
+{
+    m_customModal = open;
+    m_focus.clear();
+    m_pressed.clear();
+}
+void MenuDesignScreen::beginCustomModal()
+{
+    m_drawingConfirmation = true;
+}
+void MenuDesignScreen::endCustomModal()
+{
+    m_drawingConfirmation = false;
 }
 void MenuDesignScreen::setTextEditing(bool editing)
 {

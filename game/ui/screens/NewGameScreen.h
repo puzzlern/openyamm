@@ -86,6 +86,14 @@ public:
         CharacterCreation
     };
 
+    // The portrait grid open over the screen: picking a portrait, or a voice shown by the portrait it came from.
+    enum class PortraitPicker
+    {
+        Closed,
+        Portrait,
+        Voice
+    };
+
     struct SelectedContinent
     {
         uint32_t id = 1;
@@ -165,8 +173,11 @@ public:
     bool isGodLichSelected() const;
     std::array<int, static_cast<size_t>(StatId::Count)> statsForRace(const std::string &raceName) const;
     void cycleCandidate(int direction);
+    void selectCandidate(size_t candidateIndex);
+    void openPortraitPicker(PortraitPicker picker);
+    // A grid of portraits, opened by clicking the portrait or the voice; a click picks one.
+    void drawPortraitPicker();
     void cycleClass(int direction);
-    void cycleVoice(int direction);
     void resetCurrentState(bool applyCandidateDefaults = false);
     void confirmCreation();
     void cancelCreation();
@@ -220,6 +231,10 @@ public:
     std::string m_creationPreviewDollCacheKey;
     std::optional<TexturePixelsBgra> m_creationPreviewDollPixels;
     bool m_characterCreationInitialized = false;
+    PortraitPicker m_portraitPicker = PortraitPicker::Closed;
+    bool m_portraitPickerNew = false;
+    // The next line a click on the voice plays; back to the first when another voice is previewed.
+    uint32_t m_voiceLineIndex = 0;
     bool m_escapePressed = false;
     bool m_returnPressed = false;
 };

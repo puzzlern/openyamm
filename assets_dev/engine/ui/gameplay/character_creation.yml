@@ -112,16 +112,16 @@ elements:
     interactive: false
     notes: Native paperdoll composition and layers from NewGameScreen; do not use the browser sample or replace its rules
       with study data.
-  - id: CharacterCreationClassEmblem
+  - id: CharacterCreationRaceValue
     anchor: top_left
-    offset_x: 134.0
-    offset_y: 154.0
-    width: 34.0
-    height: 34.0
+    offset_x: 30.9333
+    offset_y: 190.0
+    width: 137.0667
+    height: 16.0
     z_index: 11
     visible: true
     interactive: false
-    notes: Selected class emblem beside the portrait's lower-right edge; controller supplies the class texture.
+    notes: The race under the portrait with the selected class's emblem after it; controller draws both.
   - id: CharacterCreationSection0
     anchor: top_left
     offset_x: 195.2
@@ -193,7 +193,7 @@ elements:
   - id: CharacterCreationNameLabel
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 193.9168
+    offset_y: 209.9168
     width: 137.0667
     height: 10.6667
     z_index: 10
@@ -210,7 +210,7 @@ elements:
   - id: CharacterCreationClassLabel
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 233.9168
+    offset_y: 249.9168
     width: 137.0667
     height: 10.6667
     z_index: 10
@@ -227,7 +227,7 @@ elements:
   - id: CharacterCreationNameField
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 206.7168
+    offset_y: 222.7168
     width: 137.0667
     height: 22.4
     z_index: 10
@@ -248,7 +248,7 @@ elements:
   - id: CharacterCreationClassValue
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 246.7168
+    offset_y: 262.7168
     width: 137.0667
     height: 23.4667
     z_index: 10
@@ -271,7 +271,7 @@ elements:
   - id: CharacterCreationVoiceValue
     anchor: top_left
     offset_x: 58.7
-    offset_y: 278.1835
+    offset_y: 294.1835
     width: 88.0
     height: 13.2
     z_index: 10
@@ -983,7 +983,7 @@ elements:
   - id: CharacterCreationVoiceLeftButton
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 275.5168
+    offset_y: 291.5168
     width: 17.6
     height: 16.5333
     z_index: 10
@@ -1005,7 +1005,7 @@ elements:
   - id: CharacterCreationVoiceRightButton
     anchor: top_left
     offset_x: 150.4
-    offset_y: 275.5168
+    offset_y: 291.5168
     width: 17.6
     height: 16.5333
     z_index: 10
@@ -1027,7 +1027,7 @@ elements:
   - id: CharacterCreationResetCharacterButton
     anchor: top_left
     offset_x: 30.9333
-    offset_y: 297.3835
+    offset_y: 313.3835
     width: 49.5915
     height: 20.2667
     z_index: 10
@@ -1049,7 +1049,7 @@ elements:
   - id: CharacterCreationRemoveCharacterButton
     anchor: top_left
     offset_x: 84.7915
-    offset_y: 297.3835
+    offset_y: 313.3835
     width: 51.5419
     height: 20.2667
     z_index: 10

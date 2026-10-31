@@ -944,6 +944,80 @@ bool GameAudioSystem::playSpeech(const Character &character, SpeechId speechId, 
     return true;
 }
 
+bool GameAudioSystem::playVoiceLine(const Character &character, uint32_t lineIndex, uint32_t speakerKey)
+{
+    if (m_pCharacterVoiceTable == nullptr || m_pAssetFileSystem == nullptr)
+    {
+        return false;
+    }
+
+    const std::optional<uint32_t> voiceId = resolveCharacterVoiceId(character);
+
+    if (!voiceId)
+    {
+        return false;
+    }
+
+    // Every distinct line of the voice whose sound file exists, in table order.
+    std::vector<std::pair<uint32_t, std::string>> lines;
+
+    for (const MergedCharacterVoiceEntry &entry : m_pCharacterVoiceTable->entries())
+    {
+        if (*voiceId >= entry.soundIdsByVoiceSetId.size())
+        {
+            continue;
+        }
+
+        const uint32_t soundId = entry.soundIdsByVoiceSetId[*voiceId];
+
+        if (soundId == 0
+            || std::any_of(lines.begin(), lines.end(), [soundId](const auto &line) { return line.first == soundId; }))
+        {
+            continue;
+        }
+
+        const std::optional<std::string> virtualPath = m_soundCatalog.buildVirtualPath(soundId);
+
+        if (virtualPath && m_pAssetFileSystem->exists(*virtualPath))
+        {
+            lines.emplace_back(soundId, *virtualPath);
+        }
+    }
+
+    if (lines.empty())
+    {
+        return false;
+    }
+
+    const auto &[soundId, virtualPath] = lines[lineIndex % lines.size()];
+
+    if (speakerKey != 0)
+    {
+        const std::unordered_map<uint32_t, uint64_t>::const_iterator activeIt =
+            m_activeSpeechInstanceIds.find(speakerKey);
+
+        if (activeIt != m_activeSpeechInstanceIds.end())
+        {
+            m_audioSystem.stopClip(activeIt->second);
+        }
+    }
+
+    const uint64_t instanceId =
+        playResolvedSound(virtualPath, PlaybackGroup::Speech, std::nullopt, false, soundId, "playVoiceLine");
+
+    if (instanceId == 0)
+    {
+        return false;
+    }
+
+    if (speakerKey != 0)
+    {
+        m_activeSpeechInstanceIds[speakerKey] = instanceId;
+    }
+
+    return true;
+}
+
 const SpeechReactionEntry *GameAudioSystem::findSpeechReaction(SpeechId speechId) const
 {
     return m_speechReactionTable.find(speechId);

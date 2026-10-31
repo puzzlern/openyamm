@@ -129,6 +129,8 @@ public:
     void endMapSoundPreload();
     Engine::AudioSystem::CacheStats cacheStats() const;
     bool playSpeech(const Character &character, SpeechId speechId, uint32_t seed = 0, uint32_t speakerKey = 0);
+    // The lineIndex-th (wrapping) of every line the character's voice has, for previewing a voice in full.
+    bool playVoiceLine(const Character &character, uint32_t lineIndex, uint32_t speakerKey = 0);
     const SpeechReactionEntry *findSpeechReaction(SpeechId speechId) const;
     void stopSoundInstance(uint64_t instanceId);
     // A map's ambience bed (world.yml ambience): one looping sound by name under the music, in the World group at
